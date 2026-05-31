@@ -17,6 +17,7 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -31,6 +32,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "products")
 // 기본 생성자는 JPA 프록시 객체 생성을 위해 필요하지만, 외부에서 빈 객체를 막기 위해 PROTECTED로 설정합니다.
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Product extends BaseEntity {
 
     @Id
@@ -60,14 +62,6 @@ public class Product extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt; // 소프트 딜리트(Soft Delete)를 위한 삭제 일시
 
-    private Product(String name, Long price, Long stock, ProductStatus status, ProductCategory category) {
-        this.name = name;
-        this.price = price;
-        this.stock = stock;
-        this.status = status;
-        this.category = category;
-    }
-
     /**
      * 객체 생성을 담당하는 정적 팩토리 메서드입니다.
      * 무분별한 new 키워드 사용을 막고, 객체가 유효한 상태로만 생성되도록 강제합니다.
@@ -77,14 +71,17 @@ public class Product extends BaseEntity {
             Long price,
             Long stock,
             String description,
+            ProductStatus status,
             ProductCategory category) {
         Product product = new Product(
+                null,
                 name,
                 price,
                 stock,
-                ProductStatus.ON_SALE, // 기본값으로 '판매중' 상태 할당
-                category);
-        product.description = description;
+                description,
+                status,
+                category,
+                null);
         return product;
     }
 
@@ -95,6 +92,9 @@ public class Product extends BaseEntity {
      * @param quantity 차감할 재고 수량
      */
     public void removeStock(Long quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new BusinessException(ProductErrorCode.INVALID_QUANTITY);
+        }
         if (this.stock < quantity) {
             throw new BusinessException(ProductErrorCode.OUT_OF_STOCK);
         }
@@ -120,12 +120,14 @@ public class Product extends BaseEntity {
     }
 
     /**
-     * 상품 정보를 수정합니다.
+     * 상품 정보를 수정합니다. (명세서 기준 재고 및 상태 덮어쓰기 포함)
      */
-    public void update(String name, Long price, String description, ProductCategory category) {
+    public void update(String name, Long price, Long stock, String description, ProductStatus status, ProductCategory category) {
         this.name = name;
         this.price = price;
+        this.stock = stock;
         this.description = description;
+        this.status = status;
         this.category = category;
     }
 

@@ -5,8 +5,6 @@ import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 
 public record ProductSearchCondition(
 	ProductCategory category,
-	Long minPrice,
-	Long maxPrice,
 	ProductStatus status
 ) {
 }

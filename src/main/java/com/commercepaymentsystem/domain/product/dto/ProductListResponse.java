@@ -1,5 +1,7 @@
 package com.commercepaymentsystem.domain.product.dto;
 
+import java.time.LocalDateTime;
+
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
@@ -9,8 +11,9 @@ public record ProductListResponse(
 	String name,
 	Long price,
 	Long stock,
+	ProductStatus status,
 	ProductCategory category,
-	ProductStatus status
+	LocalDateTime createdAt
 ) {
 	public static ProductListResponse from(Product product) {
 		return new ProductListResponse(
@@ -18,8 +21,9 @@ public record ProductListResponse(
 			product.getName(),
 			product.getPrice(),
 			product.getStock(),
+			product.getStatus(),
 			product.getCategory(),
-			product.getStatus()
+			product.getCreatedAt()
 		);
 	}
 }
