@@ -3,26 +3,34 @@ package com.commercepaymentsystem.domain.auth.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.commercepaymentsystem.domain.auth.dto.LoginRequest;
+import com.commercepaymentsystem.domain.auth.dto.LoginResponse;
 import com.commercepaymentsystem.domain.auth.dto.SignupRequest;
 import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
+import com.commercepaymentsystem.global.jwt.JwtProvider;
 
 class AuthServiceTest {
 
 	private final MemberRepository memberRepository = org.mockito.Mockito.mock(MemberRepository.class);
 	private final PasswordEncoder passwordEncoder = org.mockito.Mockito.mock(PasswordEncoder.class);
+	private final JwtProvider jwtProvider =  org.mockito.Mockito.mock(JwtProvider.class);
+
 
 	private final AuthService authService = new AuthService(
 		memberRepository,
-		passwordEncoder
+		passwordEncoder,
+		jwtProvider
 	);
 
 	@Test
@@ -77,4 +85,90 @@ class AuthServiceTest {
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.DUPLICATED_EMAIL);
 	}
+
+	@Test
+	@DisplayName("로그인 성공 시 Access Token을 반환한다")
+	void login_success() {
+		// given
+		LoginRequest request = new LoginRequest(
+			"user@example.com",
+			"Password1234!"
+		);
+
+		Member member = Member.create(
+			"user@example.com",
+			"encoded-password",
+			"홍길동",
+			"010-1234-5678"
+		);
+
+		when(memberRepository.findByEmail(request.email()))
+			.thenReturn(Optional.of(member));
+		when(passwordEncoder.matches(request.password(), member.getPassword()))
+			.thenReturn(true);
+		when(jwtProvider.createToken(member.getId(), member.getEmail()))
+			.thenReturn("access-token");
+
+		// when
+		LoginResponse response = authService.login(request);
+
+		// then
+		assertThat(response.accessToken()).isEqualTo("access-token");
+		assertThat(response.tokenType()).isEqualTo("Bearer");
+		assertThat(response.member().email()).isEqualTo("user@example.com");
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 이메일이면 로그인에 실패한다")
+	void login_notFoundEmail_fail() {
+		// given
+		LoginRequest request = new LoginRequest(
+			"user@example.com",
+			"Password1234!"
+		);
+
+		when(memberRepository.findByEmail(request.email()))
+			.thenReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> authService.login(request))
+			.isInstanceOf(BusinessException.class)
+			.satisfies(exception -> {
+				BusinessException businessException = (BusinessException) exception;
+				assertThat(businessException.getErrorCode())
+					.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+			});
+	}
+
+	@Test
+	@DisplayName("비밀번호가 일치하지 않으면 로그인에 실패한다")
+	void login_invalidPassword_fail() {
+		// given
+		LoginRequest request = new LoginRequest(
+			"user@example.com",
+			"WrongPassword123!"
+		);
+
+		Member member = Member.create(
+			"user@example.com",
+			"encoded-password",
+			"홍길동",
+			"010-1234-5678"
+		);
+
+		when(memberRepository.findByEmail(request.email()))
+			.thenReturn(Optional.of(member));
+		when(passwordEncoder.matches(request.password(), member.getPassword()))
+			.thenReturn(false);
+
+		// when & then
+		assertThatThrownBy(() -> authService.login(request))
+			.isInstanceOf(BusinessException.class)
+			.satisfies(exception -> {
+				BusinessException businessException = (BusinessException) exception;
+				assertThat(businessException.getErrorCode())
+					.isEqualTo(MemberErrorCode.INVALID_LOGIN_INFO);
+			});
+	}
+
 }
