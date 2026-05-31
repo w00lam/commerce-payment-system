@@ -24,8 +24,7 @@ class AuthServiceTest {
 
 	private final MemberRepository memberRepository = org.mockito.Mockito.mock(MemberRepository.class);
 	private final PasswordEncoder passwordEncoder = org.mockito.Mockito.mock(PasswordEncoder.class);
-	private final JwtProvider jwtProvider =  org.mockito.Mockito.mock(JwtProvider.class);
-
+	private final JwtProvider jwtProvider = org.mockito.Mockito.mock(JwtProvider.class);
 
 	private final AuthService authService = new AuthService(
 		memberRepository,
@@ -102,7 +101,7 @@ class AuthServiceTest {
 			"010-1234-5678"
 		);
 
-		when(memberRepository.findByEmail(request.email()))
+		when(memberRepository.findByEmailAndDeletedAtIsNull(request.email()))
 			.thenReturn(Optional.of(member));
 		when(passwordEncoder.matches(request.password(), member.getPassword()))
 			.thenReturn(true);
@@ -127,16 +126,16 @@ class AuthServiceTest {
 			"Password1234!"
 		);
 
-		when(memberRepository.findByEmail(request.email()))
+		when(memberRepository.findByEmailAndDeletedAtIsNull(request.email()))
 			.thenReturn(Optional.empty());
 
 		// when & then
 		assertThatThrownBy(() -> authService.login(request))
 			.isInstanceOf(BusinessException.class)
 			.satisfies(exception -> {
-				BusinessException businessException = (BusinessException) exception;
+				BusinessException businessException = (BusinessException)exception;
 				assertThat(businessException.getErrorCode())
-					.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+					.isEqualTo(MemberErrorCode.INVALID_LOGIN_INFO);
 			});
 	}
 
@@ -156,7 +155,7 @@ class AuthServiceTest {
 			"010-1234-5678"
 		);
 
-		when(memberRepository.findByEmail(request.email()))
+		when(memberRepository.findByEmailAndDeletedAtIsNull(request.email()))
 			.thenReturn(Optional.of(member));
 		when(passwordEncoder.matches(request.password(), member.getPassword()))
 			.thenReturn(false);
@@ -165,7 +164,7 @@ class AuthServiceTest {
 		assertThatThrownBy(() -> authService.login(request))
 			.isInstanceOf(BusinessException.class)
 			.satisfies(exception -> {
-				BusinessException businessException = (BusinessException) exception;
+				BusinessException businessException = (BusinessException)exception;
 				assertThat(businessException.getErrorCode())
 					.isEqualTo(MemberErrorCode.INVALID_LOGIN_INFO);
 			});

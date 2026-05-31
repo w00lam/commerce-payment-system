@@ -59,11 +59,11 @@ public class AuthService {
 	 *
 	 * @param request 로그인 요청 정보
 	 * @return JWT Access Token과 로그인 회원 정보를 포함한 응답
-	 * @throws BusinessException 이메일이 존재하지 않거나, 비밀번호가 일치하지 않는 경우
+	 * @throws BusinessException 이메일이 존재하지 않거나, 탈퇴/삭제된 회원이거나, 비밀번호가 일치하지 않는 경우
 	 */
 	public LoginResponse login(LoginRequest request) {
-		Member member = memberRepository.findByEmail(request.email())
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+		Member member = memberRepository.findByEmailAndDeletedAtIsNull(request.email())
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.INVALID_LOGIN_INFO));
 
 		validatePassword(
 			request.password(),

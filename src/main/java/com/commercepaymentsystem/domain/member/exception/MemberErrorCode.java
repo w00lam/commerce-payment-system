@@ -17,27 +17,21 @@ public enum MemberErrorCode implements ErrorCode {
 		"이미 가입된 이메일입니다."
 	),
 
-	MEMBER_NOT_FOUND(
-		HttpStatus.NOT_FOUND,
-		"MEMBER_002",
-		"회원을 찾을 수 없습니다."
-	),
-
 	INVALID_LOGIN_INFO(
 		HttpStatus.UNAUTHORIZED,
-		"MEMBER_003",
+		"MEMBER_002",
 		"이메일 또는 비밀번호가 일치하지 않습니다."
 	),
 
 	DELETED_MEMBER(
 		HttpStatus.FORBIDDEN,
-		"MEMBER_004",
+		"MEMBER_003",
 		"탈퇴한 회원입니다."
 	),
 
 	POINT_NOT_ENOUGH(
 		HttpStatus.BAD_REQUEST,
-		"MEMBER_005",
+		"MEMBER_004",
 		"보유 포인트가 부족합니다."
 	);
 

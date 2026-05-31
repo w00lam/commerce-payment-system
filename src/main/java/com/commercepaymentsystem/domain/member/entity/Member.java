@@ -1,5 +1,7 @@
 package com.commercepaymentsystem.domain.member.entity;
 
+import java.time.LocalDateTime;
+
 import com.commercepaymentsystem.global.entity.BaseEntity;
 
 import jakarta.persistence.Column;
@@ -62,6 +64,9 @@ public class Member extends BaseEntity {
 	)
 	private Long pointBalance;
 
+	@Column(name = "deleted_at")
+	private LocalDateTime deletedAt;
+
 	public static Member create(
 		String email,
 		String encodedPassword,
@@ -78,5 +83,13 @@ public class Member extends BaseEntity {
 		member.pointBalance = DEFAULT_POINT_BALANCE;
 
 		return member;
+	}
+
+	public void delete() {
+		this.deletedAt = LocalDateTime.now();
+	}
+
+	public boolean isDeleted() {
+		return this.deletedAt != null;
 	}
 }
