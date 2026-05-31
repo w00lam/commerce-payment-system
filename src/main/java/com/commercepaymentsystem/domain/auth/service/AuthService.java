@@ -1,8 +1,5 @@
 package com.commercepaymentsystem.domain.auth.service;
 
-import lombok.RequiredArgsConstructor;
-
-import org.hibernate.service.spi.ServiceException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +9,9 @@ import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.global.exception.BusinessException;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -40,8 +40,8 @@ public class AuthService {
 	}
 
 	private void validateDuplicatedEmail(String email) {
-		if (memberRepository.existsByEmailAndDeletedAtIsNull(email)) {
-			throw new ServiceException(MemberErrorCode.DUPLICATED_EMAIL.getMessage());
+		if (memberRepository.existsByEmail(email)) {
+			throw new BusinessException(MemberErrorCode.DUPLICATED_EMAIL);
 		}
 	}
 }

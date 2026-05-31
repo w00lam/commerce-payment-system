@@ -11,11 +11,14 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 
 @Entity
 @Getter
 @Table(name = "members")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class Member extends BaseEntity {
 
 	private static final long DEFAULT_POINT_BALANCE = 0L;
@@ -24,6 +27,7 @@ public class Member extends BaseEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	@NonNull
 	@Column(
 		nullable = false,
 		unique = true,
@@ -31,18 +35,21 @@ public class Member extends BaseEntity {
 	)
 	private String email;
 
+	@NonNull
 	@Column(
 		nullable = false,
 		length = 255
 	)
 	private String password;
 
+	@NonNull
 	@Column(
 		nullable = false,
 		length = 50
 	)
 	private String name;
 
+	@NonNull
 	@Column(
 		nullable = false,
 		length = 20
@@ -55,30 +62,21 @@ public class Member extends BaseEntity {
 	)
 	private Long pointBalance;
 
-	private Member(
-		String email,
-		String password,
-		String name,
-		String phone
-	) {
-		this.email = email;
-		this.password = password;
-		this.name = name;
-		this.phone = phone;
-		this.pointBalance = DEFAULT_POINT_BALANCE;
-	}
-
 	public static Member create(
 		String email,
 		String encodedPassword,
 		String name,
 		String phone
 	) {
-		return new Member(
+		Member member = new Member(
 			email,
 			encodedPassword,
 			name,
 			phone
 		);
+
+		member.pointBalance = DEFAULT_POINT_BALANCE;
+
+		return member;
 	}
 }
