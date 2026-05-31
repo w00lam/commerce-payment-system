@@ -2,5 +2,9 @@ package com.commercepaymentsystem.domain.member.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface MemberRepository {
+import com.commercepaymentsystem.domain.member.entity.Member;
+
+public interface MemberRepository extends JpaRepository<Member, Long> {
+
+	boolean existsByEmail(String email);
 }
