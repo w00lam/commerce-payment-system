@@ -1,13 +1,11 @@
 package com.commercepaymentsystem.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.commercepaymentsystem.domain.auth.dto.SignupRequest;
@@ -15,7 +13,6 @@ import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
-import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 class AuthServiceTest {

@@ -21,6 +21,13 @@ public class AuthService {
 	private final MemberRepository memberRepository;
 	private final PasswordEncoder passwordEncoder;
 
+	/**
+	 * 회원가입을 처리합니다.
+	 *
+	 * @param request 회원가입 요청 정보
+	 * @return 가입된 회원 정보
+	 * @throws BusinessException 이메일이 이미 존재하는 경우
+	 */
 	@Transactional
 	public SignupResponse signup(SignupRequest request) {
 		validateDuplicatedEmail(request.email());
