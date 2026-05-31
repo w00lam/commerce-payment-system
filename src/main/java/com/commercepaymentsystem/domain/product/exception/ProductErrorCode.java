@@ -12,9 +12,15 @@ import lombok.RequiredArgsConstructor;
 public enum ProductErrorCode implements ErrorCode {
 
 	PRODUCT_NOT_FOUND(
-		HttpStatus.NOT_FOUND,
+		HttpStatus.BAD_REQUEST,
 		"PRODUCT_001",
 		"상품을 찾을 수 없습니다."
+	),
+
+	INVALID_QUANTITY(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_003",
+		"수량은 1 이상이어야 합니다."
 	),
 
 	OUT_OF_STOCK(
