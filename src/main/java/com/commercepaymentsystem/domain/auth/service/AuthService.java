@@ -26,7 +26,8 @@ public class AuthService {
 	private final JwtProvider jwtProvider;
 
 	/**
-	 * 회원가입을 처리합니다.
+	 * 회원가입 요청 정보를 검증하고 신규 회원을 생성합니다.
+	 * 이메일 중복 여부를 확인한 뒤 비밀번호를 암호화하여 회원 정보를 저장합니다.
 	 *
 	 * @param request 회원가입 요청 정보
 	 * @return 가입된 회원 정보
@@ -50,6 +51,16 @@ public class AuthService {
 		return SignupResponse.from(savedMember);
 	}
 
+	/**
+	 * 로그인 요청 정보를 검증하고 JWT Access Token을 발급합니다.
+	 *
+	 * 이메일로 회원을 조회한 뒤, 입력된 비밀번호와 저장된 암호화 비밀번호를 비교합니다.
+	 * 검증에 성공하면 JWT Access Token을 생성하여 로그인 응답으로 반환합니다.
+	 *
+	 * @param request 로그인 요청 정보
+	 * @return JWT Access Token과 로그인 회원 정보를 포함한 응답
+	 * @throws BusinessException 이메일이 존재하지 않거나, 비밀번호가 일치하지 않는 경우
+	 */
 	public LoginResponse login(LoginRequest request) {
 		Member member = memberRepository.findByEmail(request.email())
 			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
@@ -70,12 +81,28 @@ public class AuthService {
 		);
 	}
 
+	/**
+	 * 이메일 중복 여부를 검증합니다.
+	 *
+	 * 이미 동일한 이메일로 가입된 회원이 존재하는 경우 회원가입을 진행하지 않고
+	 * {@link MemberErrorCode#DUPLICATED_EMAIL} 예외를 발생시킵니다.
+	 *
+	 * @param email 중복 검증할 이메일
+	 * @throws BusinessException 이미 가입된 이메일인 경우
+	 */
 	private void validateDuplicatedEmail(String email) {
 		if (memberRepository.existsByEmail(email)) {
 			throw new BusinessException(MemberErrorCode.DUPLICATED_EMAIL);
 		}
 	}
 
+	/**
+	 * 입력된 비밀번호와 저장된 암호화 비밀번호가 일치하는지 검증합니다.
+	 *
+	 * @param rawPassword 사용자가 입력한 평문 비밀번호
+	 * @param encodedPassword DB에 저장된 암호화 비밀번호
+	 * @throws BusinessException 비밀번호가 일치하지 않는 경우
+	 */
 	private void validatePassword(
 		String rawPassword,
 		String encodedPassword
