@@ -3,7 +3,7 @@ spring:
     name: sparta-payment-system
 
   datasource:
-    url: jdbc:mysql://localhost:3306/payment_db
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -33,8 +33,8 @@ server:
 
 # JWT 설정
 jwt:
-  secret: "c3BhcnRhLXBheW1lbnQtand0LXNlY3JldC1rZXktZm9yLWJvb3RjYW1wLTIwMjYtdmVyeS1sb25nLXNlY3JldA=="  # Base64 encoded
-  expiration: 3600000  # 1시간 (ms)
+  secret: ${JWT_SECRET} # Base64 encoded
+  expiration: ${JWT_ACCESS_TOKEN_EXPIRATION} # 1시간 (ms)
 
 portone:
   base-url: "https://api.portone.io"
