@@ -18,12 +18,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import com.commercepaymentsystem.domain.member.entity.Member;
+import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
 import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
 import com.commercepaymentsystem.domain.point.entity.PointHistory;
 import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
+import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
@@ -68,6 +70,7 @@ class PointServiceTest {
 		given(history2.getType()).willReturn(PointHistoryType.USE);
 		given(history2.getAmount()).willReturn(200L);
 
+		given(memberRepository.existsById(memberId)).willReturn(true);
 		Page<PointHistory> page = new PageImpl<>(List.of(history1, history2), pageable, 2);
 		given(pointHistoryRepository.findByMemberId(memberId, pageable)).willReturn(page);
 
@@ -84,7 +87,7 @@ class PointServiceTest {
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 예외가 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 BusinessException이 발생한다.")
 	void getMyPoint_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -92,7 +95,23 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPoint(memberId))
-			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessage("회원을 찾을 수 없습니다.");
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 BusinessException이 발생한다.")
+	void getMyPointHistories_MemberNotFound() {
+		// given
+		Long memberId = 1L;
+		Pageable pageable = PageRequest.of(0, 20);
+		given(memberRepository.existsById(memberId)).willReturn(false);
+
+		// when & then
+		assertThatThrownBy(() -> pointService.getMyPointHistories(memberId, pageable))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
 }

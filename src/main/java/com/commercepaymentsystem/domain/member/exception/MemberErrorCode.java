@@ -29,7 +29,7 @@ public enum MemberErrorCode implements ErrorCode {
 		"탈퇴한 회원입니다."
 	),
 
-	POINT_NOT_ENOUGH(
+	MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER_005", "존재하지 않는 회원입니다."), POINT_NOT_ENOUGH(
 		HttpStatus.BAD_REQUEST,
 		"MEMBER_004",
 		"보유 포인트가 부족합니다."
