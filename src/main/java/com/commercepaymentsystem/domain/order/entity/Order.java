@@ -27,33 +27,28 @@ public class Order extends BaseEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	// 주문 회원
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "member_id", nullable = false)
 	private Member member;
 
-	// 사용자에게 노출되는 주문번호
 	@Column(nullable = false, unique = true, length = 50)
 	private String orderNumber;
 
-	// 총 주문 금액
-	@Column(nullable = false)
-	private Integer totalAmount;
+	@Column(nullable = false, columnDefinition = "INT UNSIGNED")
+	private Long totalAmount;
 
-	// 사용 포인트 금액
-	@Column(nullable = false)
-	private Integer usedPointAmount;
+	@Column(nullable = false, columnDefinition = "INT UNSIGNED")
+	private Long usedPointAmount;
 
-	// 주문 상태
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
 	private OrderStatus status;
 
-	private Order (
+	private Order(
 		Member member,
 		String orderNumber,
-		Integer totalAmount,
-		Integer usedPointAmount
+		Long totalAmount,
+		Long usedPointAmount
 	) {
 		this.member = member;
 		this.orderNumber = orderNumber;
@@ -65,8 +60,8 @@ public class Order extends BaseEntity {
 	public static Order create(
 		Member member,
 		String orderNumber,
-		Integer totalAmount,
-		Integer usedPointAmount
+		Long totalAmount,
+		Long usedPointAmount
 	) {
 		return new Order(
 			member,
