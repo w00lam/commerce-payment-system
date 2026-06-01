@@ -110,7 +110,7 @@ class ProductServiceTest {
 		// given
 		Product product = Product.create("기존 상품", 1000L, 10L, "기존 설명", ProductStatus.ON_SALE, ProductCategory.ELECTRONICS);
 		given(productRepository.findById(1L)).willReturn(Optional.of(product));
-		ProductUpdateRequest request = new ProductUpdateRequest("수정 상품", 2000L, 20L, "수정 설명", ProductStatus.SOLD_OUT, ProductCategory.FOOD);
+		ProductUpdateRequest request = new ProductUpdateRequest("수정 상품", 2000L, 20L, "수정 설명", ProductStatus.ON_SALE, ProductCategory.FOOD);
 
 		// when
 		ProductUpdateResponse response = productService.updateProduct(1L, request);
@@ -119,7 +119,7 @@ class ProductServiceTest {
 		assertThat(response.name()).isEqualTo("수정 상품");
 		assertThat(response.price()).isEqualTo(2000L);
 		assertThat(product.getStock()).isEqualTo(20L); // 객체 내부 상태 변경 확인
-		assertThat(product.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+		assertThat(product.getStatus()).isEqualTo(ProductStatus.ON_SALE);
 	}
 
 	@Test

@@ -101,14 +101,14 @@ class ProductTest {
 		Product product = Product.create("테스트 상품", 10000L, 100L, "설명", ProductStatus.ON_SALE, ProductCategory.ELECTRONICS);
 
 		// when
-		product.update("수정 상품", 20000L, 50L, "수정 설명", ProductStatus.SOLD_OUT, ProductCategory.FOOD);
+		product.update("수정 상품", 20000L, 50L, "수정 설명", ProductStatus.ON_SALE, ProductCategory.FOOD);
 
 		// then
 		assertThat(product.getName()).isEqualTo("수정 상품");
 		assertThat(product.getPrice()).isEqualTo(20000L);
 		assertThat(product.getStock()).isEqualTo(50L);
 		assertThat(product.getDescription()).isEqualTo("수정 설명");
-		assertThat(product.getStatus()).isEqualTo(ProductStatus.SOLD_OUT);
+		assertThat(product.getStatus()).isEqualTo(ProductStatus.ON_SALE);
 		assertThat(product.getCategory()).isEqualTo(ProductCategory.FOOD);
 	}
 }

@@ -26,7 +26,6 @@ import lombok.NoArgsConstructor;
  * ERD 명세에 따라 필요한 컬럼들을 정의하고 있습니다.
  */
 @SQLRestriction("deleted_at IS NULL")
-@SQLDelete(sql = "UPDATE products SET deleted_at = NOW() WHERE id = ?")
 @Entity
 @Getter
 @Table(name = "products")
@@ -127,8 +126,16 @@ public class Product extends BaseEntity {
         this.price = price;
         this.stock = stock;
         this.description = description;
-        this.status = status;
         this.category = category;
+
+        // 도메인 규칙에 따라 재고와 상태 불일치 보정
+        if (this.stock == 0) {
+            this.status = ProductStatus.SOLD_OUT;
+        } else if (this.stock > 0 && status == ProductStatus.SOLD_OUT) {
+            this.status = ProductStatus.ON_SALE;
+        } else {
+            this.status = status;
+        }
     }
 
     /**
