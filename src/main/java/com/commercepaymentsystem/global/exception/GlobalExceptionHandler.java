@@ -28,13 +28,13 @@ public class GlobalExceptionHandler {
 			.reduce((a, b) -> a + ", " + b)
 			.orElse("입력값이 올바르지 않습니다");
 		return ResponseEntity.badRequest()
-			.body(ApiResponse.error(ErrorCode.INVALID_INPUT, message));
+			.body(ApiResponse.error(GlobalErrorCode.INVALID_INPUT_VALUE, message));
 	}
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
 		log.error("서버 오류 발생", e);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-			.body(ApiResponse.error(ErrorCode.INTERNAL_ERROR));
+			.body(ApiResponse.error(GlobalErrorCode.INTERNAL_SERVER_ERROR));
 	}
 }

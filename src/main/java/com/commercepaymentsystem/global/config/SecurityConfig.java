@@ -13,7 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.commercepaymentsystem.global.exception.ErrorCode;
+import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 import com.commercepaymentsystem.global.filter.JwtAuthFilter;
 import com.commercepaymentsystem.global.response.ApiResponse;
 
@@ -42,7 +42,7 @@ public class SecurityConfig {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(
-                        objectMapper.writeValueAsString(ApiResponse.error(ErrorCode.UNAUTHORIZED))
+                        objectMapper.writeValueAsString(ApiResponse.error(GlobalErrorCode.UNAUTHORIZED))
                     );
                 })
             )
