@@ -33,6 +33,42 @@ public enum PaymentErrorCode implements ErrorCode {
 		HttpStatus.INTERNAL_SERVER_ERROR,
 		"PAYMENT_004",
 		"Failed to generate payment id."
+	),
+
+	INVALID_PAYMENT_ID(
+		HttpStatus.BAD_REQUEST,
+		"PAYMENT_005",
+		"Invalid payment id."
+	),
+
+	PAYMENT_NOT_FOUND(
+		HttpStatus.NOT_FOUND,
+		"PAYMENT_006",
+		"Payment not found."
+	),
+
+	PAYMENT_OWNER_MISMATCH(
+		HttpStatus.FORBIDDEN,
+		"PAYMENT_007",
+		"Payment owner mismatch."
+	),
+
+	INVALID_PAYMENT_STATUS(
+		HttpStatus.CONFLICT,
+		"PAYMENT_008",
+		"Invalid payment status."
+	),
+
+	PORTONE_PAYMENT_VERIFICATION_FAILED(
+		HttpStatus.BAD_REQUEST,
+		"PAYMENT_009",
+		"PortOne payment verification failed."
+	),
+
+	PORTONE_PAYMENT_REQUEST_FAILED(
+		HttpStatus.BAD_GATEWAY,
+		"PAYMENT_010",
+		"PortOne payment request failed."
 	);
 
 	private final HttpStatus status;

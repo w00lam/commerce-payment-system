@@ -1,5 +1,7 @@
 package com.commercepaymentsystem.domain.payment.entity;
 
+import java.time.Instant;
+
 import com.commercepaymentsystem.global.entity.BaseEntity;
 
 import jakarta.persistence.Column;
@@ -59,6 +61,10 @@ public class Payment extends BaseEntity {
 	)
 	private PaymentStatus status;
 
+	// 결제 확정이 성공한 시각입니다. PortOne 승인 시각 또는 서버 처리 시각을 저장합니다.
+	@Column(name = "paid_at")
+	private Instant paidAt;
+
 	public static Payment create(
 		String paymentId,
 		Long memberId,
@@ -76,5 +82,29 @@ public class Payment extends BaseEntity {
 			finalPaymentAmount,
 			PaymentStatus.PENDING
 		);
+	}
+
+	/**
+	 * 결제가 이미 확정 상태인지 확인합니다.
+	 */
+	public boolean isConfirmed() {
+		return this.status.isConfirmed();
+	}
+
+	/**
+	 * 결제가 확정 가능한 상태인지 확인합니다.
+	 */
+	public boolean isConfirmable() {
+		return this.status.isConfirmable();
+	}
+
+	/**
+	 * 결제를 확정 상태로 변경하고 확정 시각을 저장합니다.
+	 *
+	 * 상태 전이 가능 여부와 다음 상태 결정은 {@link PaymentStatus}에 위임합니다.
+	 */
+	public void confirm(Instant paidAt) {
+		this.status = this.status.confirm();
+		this.paidAt = paidAt;
 	}
 }
