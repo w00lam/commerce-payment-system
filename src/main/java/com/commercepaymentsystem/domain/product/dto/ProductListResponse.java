@@ -10,7 +10,6 @@ public record ProductListResponse(
 	Long id,
 	String name,
 	Long price,
-	Long stock,
 	ProductStatus status,
 	ProductCategory category,
 	LocalDateTime createdAt
@@ -20,7 +19,6 @@ public record ProductListResponse(
 			product.getId(),
 			product.getName(),
 			product.getPrice(),
-			product.getStock(),
 			product.getStatus(),
 			product.getCategory(),
 			product.getCreatedAt()
