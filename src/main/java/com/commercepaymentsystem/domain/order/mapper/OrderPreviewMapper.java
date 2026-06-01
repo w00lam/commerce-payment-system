@@ -5,20 +5,24 @@ import java.util.List;
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewItemResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
+import com.commercepaymentsystem.domain.product.entity.Product;
 
 public class OrderPreviewMapper {
 
 	private OrderPreviewMapper() {
 	}
 
-	public static OrderPreviewItemResponse toItemResponse(CartItem cartItem) {
-		Long currentPrice = cartItem.getProduct().getPrice();
+	public static OrderPreviewItemResponse toItemResponse(
+		CartItem cartItem,
+		Product product
+	) {
+		Long currentPrice = product.getPrice();
 		Long quantity = cartItem.getQuantity();
 
 		return new OrderPreviewItemResponse(
 			cartItem.getId(),
-			cartItem.getProduct().getId(),
-			cartItem.getProduct().getName(),
+			product.getId(),
+			product.getName(),
 			currentPrice,
 			quantity,
 			currentPrice * quantity
