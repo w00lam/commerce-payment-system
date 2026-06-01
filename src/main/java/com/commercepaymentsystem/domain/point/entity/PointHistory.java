@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "point_histories")
+@Table(
+	name = "point_histories",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_point_history_payment_type",
+			columnNames = {"payment_id", "type"}
+		)
+	}
+)
 public class PointHistory extends BaseEntity {
 
 	@Id
@@ -18,10 +26,18 @@ public class PointHistory extends BaseEntity {
 
 	private Long memberId;
 
+	@Column(nullable = false)
 	private Long paymentId;
 
 	@Enumerated(EnumType.STRING)
 	private PointHistoryType type;
 
 	private Long amount;
+
+	public PointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
+		this.memberId = memberId;
+		this.paymentId = paymentId;
+		this.type = type;
+		this.amount = amount;
+	}
 }

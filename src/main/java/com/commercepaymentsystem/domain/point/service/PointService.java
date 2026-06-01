@@ -5,6 +5,10 @@ import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
 import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
+import com.commercepaymentsystem.domain.point.entity.PointHistory;
+import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
+import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -42,14 +46,43 @@ public class PointService {
 			));
 	}
 
+	/**
+	 * 포인트 적립 (결제 완료 시 등)
+	 * 멱등성 보장을 위해 락 획득 후 중복 여부를 재검증함
+	 */
+	@Transactional
+	public void earnPoint(Long memberId, Long amount, Long paymentId) {
+		if (amount == null || amount <= 0) {
+			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
+		}
+
+		if (paymentId == null) {
+			throw new PointException(PointErrorCode.PAYMENT_ID_REQUIRED);
+		}
+
+		// 1. 비관적 락을 먼저 획득하여 동시성 제어 및 원자적 검증 환경 조성 (Lost Update 방지)
+		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
+			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+		// 2. 락 획득 상태에서 멱등성 재검증 (중복 적립 방지)
+		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
+			throw new PointException(PointErrorCode.ALREADY_EARNED_POINT);
+		}
+
+		member.addPoint(amount);
+
+		PointHistory history = new PointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
+		pointHistoryRepository.save(history);
+	}
+
 	private Member findMemberById(Long memberId) {
 		return memberRepository.findById(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 
 	private void validateMemberExists(Long memberId) {
 		if (!memberRepository.existsById(memberId)) {
-			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+			throw new PointException(MemberErrorCode.MEMBER_NOT_FOUND);
 		}
 	}
 }
