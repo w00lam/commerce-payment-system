@@ -99,4 +99,14 @@ public class Member extends BaseEntity {
 		}
 		this.pointBalance += amount;
 	}
+
+	public void deductPoint(Long amount) {
+		if (amount == null || amount <= 0) {
+			throw new IllegalArgumentException("차감할 포인트는 0보다 커야 합니다.");
+		}
+		if (this.pointBalance < amount) {
+			throw new IllegalStateException("보유 포인트가 부족합니다.");
+		}
+		this.pointBalance -= amount;
+	}
 }

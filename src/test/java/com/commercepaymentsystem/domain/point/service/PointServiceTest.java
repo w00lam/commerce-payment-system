@@ -27,7 +27,6 @@ import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
 import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
-import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
@@ -125,6 +124,67 @@ class PointServiceTest {
 			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
 			.isEqualTo(PointErrorCode.PAYMENT_ID_REQUIRED);
+	}
+
+	@Test
+	@DisplayName("포인트를 성공적으로 차감하고 이력을 남긴다.")
+	void deductPoint_Success() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		member.addPoint(1000L); // 초기 잔액 1000원
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)).willReturn(false);
+
+		// when
+		pointService.deductPoint(memberId, amount, paymentId);
+
+		// then
+		assertThat(member.getPointBalance()).isEqualTo(500L);
+		verify(pointHistoryRepository).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("보유 포인트가 부족하면 PointException이 발생한다.")
+	void deductPoint_InsufficientPoint() {
+		// given
+		Long memberId = 1L;
+		Long amount = 1500L;
+		Long paymentId = 100L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		member.addPoint(1000L); // 초기 잔액 1000원
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)).willReturn(false);
+
+		// when & then
+		assertThatThrownBy(() -> pointService.deductPoint(memberId, amount, paymentId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.INSUFFICIENT_POINT);
+	}
+
+	@Test
+	@DisplayName("이미 차감된 결제 건에 대해 다시 차감을 시도하면 추가 차감 없이 리턴한다.")
+	void deductPoint_AlreadyDeducted() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Member member = mock(Member.class);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)).willReturn(true);
+
+		// when
+		pointService.deductPoint(memberId, amount, paymentId);
+
+		// then
+		verify(member, never()).deductPoint(anyLong());
+		verify(pointHistoryRepository, never()).save(any(PointHistory.class));
 	}
 
 	@Test

@@ -29,21 +29,16 @@ public enum MemberErrorCode implements ErrorCode {
 		"탈퇴한 회원입니다."
 	),
 
-	POINT_NOT_ENOUGH(
-		HttpStatus.BAD_REQUEST,
-		"MEMBER_004",
-		"보유 포인트가 부족합니다."
-	),
 
 	MEMBER_NOT_FOUND(
 		HttpStatus.NOT_FOUND,
-		"MEMBER_005",
+		"MEMBER_004",
 		"존재하지 않는 회원입니다."
 	),
 
 	INVALID_PASSWORD(
 		HttpStatus.UNAUTHORIZED,
-		"MEMBER_006",
+		"MEMBER_005",
 		"비밀번호가 일치하지 않습니다."
 	);
 

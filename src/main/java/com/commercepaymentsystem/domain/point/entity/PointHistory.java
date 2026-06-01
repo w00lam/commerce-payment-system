@@ -24,14 +24,17 @@ public class PointHistory extends BaseEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	@Column(nullable = false)
 	private Long memberId;
 
 	@Column(nullable = false)
 	private Long paymentId;
 
 	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
 	private PointHistoryType type;
 
+	@Column(nullable = false)
 	private Long amount;
 
 	public PointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
