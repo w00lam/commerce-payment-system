@@ -170,4 +170,10 @@ class AuthServiceTest {
 			});
 	}
 
+	@Test
+	@DisplayName("로그아웃 요청은 예외 없이 완료된다")
+	void logout_success() {
+		assertThatCode(() -> authService.logout())
+			.doesNotThrowAnyException();
+	}
 }

@@ -111,4 +111,15 @@ public class AuthService {
 			throw new BusinessException(MemberErrorCode.INVALID_LOGIN_INFO);
 		}
 	}
+
+	/**
+	 * 로그아웃 요청을 처리합니다.
+	 *
+	 * 현재 인증 구조는 JWT Access Token 기반이며, 서버에서 토큰을 별도로 저장하지 않습니다.
+	 * 따라서 서버에서는 별도의 토큰 폐기 처리를 수행하지 않고, 클라이언트에서 보관 중인
+	 * Access Token을 삭제하는 방식으로 로그아웃을 처리합니다.
+	 */
+	public void logout() {
+		// JWT Access Token만 사용하는 구조에서는 서버에서 처리할 로직이 없습니다.
+	}
 }
