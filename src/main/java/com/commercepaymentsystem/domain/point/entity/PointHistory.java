@@ -24,4 +24,11 @@ public class PointHistory extends BaseEntity {
 	private PointHistoryType type;
 
 	private Long amount;
+
+	public PointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
+		this.memberId = memberId;
+		this.paymentId = paymentId;
+		this.type = type;
+		this.amount = amount;
+	}
 }

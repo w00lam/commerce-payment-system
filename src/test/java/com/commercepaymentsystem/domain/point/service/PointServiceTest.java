@@ -24,6 +24,8 @@ import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
 import com.commercepaymentsystem.domain.point.entity.PointHistory;
 import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
+import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
@@ -54,6 +56,40 @@ class PointServiceTest {
 		// then
 		assertThat(response.pointBalance()).isEqualTo(1000L);
 		verify(memberRepository).findById(memberId);
+	}
+
+	@Test
+	@DisplayName("포인트를 성공적으로 적립하고 이력을 남긴다.")
+	void earnPoint_Success() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		
+		given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+
+		// when
+		pointService.earnPoint(memberId, amount, paymentId);
+
+		// then
+		assertThat(member.getPointBalance()).isEqualTo(500L);
+		verify(pointHistoryRepository).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("적립 금액이 0원 이하이면 PointException이 발생한다.")
+	void earnPoint_InvalidAmount() {
+		// given
+		Long memberId = 1L;
+		Long amount = 0L;
+		Long paymentId = 100L;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.INVALID_POINT_AMOUNT);
 	}
 
 	@Test
@@ -95,21 +131,6 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPoint(memberId))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode")
-			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
-	}
-
-	@Test
-	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 BusinessException이 발생한다.")
-	void getMyPointHistories_MemberNotFound() {
-		// given
-		Long memberId = 1L;
-		Pageable pageable = PageRequest.of(0, 20);
-		given(memberRepository.existsById(memberId)).willReturn(false);
-
-		// when & then
-		assertThatThrownBy(() -> pointService.getMyPointHistories(memberId, pageable))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);

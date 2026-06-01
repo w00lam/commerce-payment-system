@@ -5,6 +5,10 @@ import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
 import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
+import com.commercepaymentsystem.domain.point.entity.PointHistory;
+import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
+import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +44,22 @@ public class PointService {
 				history.getAmount(),
 				history.getCreatedAt()
 			));
+	}
+
+	/**
+	 * 포인트 적립 (결제 완료 시 등)
+	 */
+	@Transactional
+	public void earnPoint(Long memberId, Long amount, Long paymentId) {
+		if (amount == null || amount <= 0) {
+			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
+		}
+
+		Member member = findMemberById(memberId);
+		member.addPoint(amount);
+
+		PointHistory history = new PointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
+		pointHistoryRepository.save(history);
 	}
 
 	private Member findMemberById(Long memberId) {

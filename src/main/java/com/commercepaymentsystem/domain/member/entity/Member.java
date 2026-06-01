@@ -92,4 +92,11 @@ public class Member extends BaseEntity {
 	public boolean isDeleted() {
 		return this.deletedAt != null;
 	}
+
+	public void addPoint(Long amount) {
+		if (amount == null || amount <= 0) {
+			throw new IllegalArgumentException("적립할 포인트는 0보다 커야 합니다.");
+		}
+		this.pointBalance += amount;
+	}
 }
