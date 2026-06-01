@@ -32,7 +32,7 @@ public class Cart extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "member_id", nullable = false)
+    @Column(name = "member_id", nullable = false, unique = true)
     private Long memberId;
 
     @Column(name = "deleted_at")

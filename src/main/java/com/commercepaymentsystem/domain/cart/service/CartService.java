@@ -80,35 +80,37 @@ public class CartService {
 
     /**
      * 내 장바구니에 담긴 모든 상품 목록을 조회합니다.
+     * 장바구니가 없으면 빈 응답을 반환하여 CQRS 원칙(조회 시 부작용 없음)을 지킵니다.
      * N+1 쿼리 문제를 방지하기 위해 상품(Product) 정보는 한 번에 Bulk 쿼리(findAllById)로 조회합니다.
      *
      * @param memberId 회원 ID
      * @return 장바구니 정보 및 상품 목록 (CartResponse)
      */
     public CartResponse getMyCart(Long memberId) {
-        Cart cart = cartRepository.findByMemberId(memberId)
-            .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
-
-        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
-        
-        List<Long> productIds = cartItems.stream()
-            .map(CartItem::getProductId)
-            .toList();
-            
-        java.util.Map<Long, Product> productMap = productRepository.findAllById(productIds).stream()
-            .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
-
-        List<CartItemDto> itemDtos = cartItems.stream()
-            .map(cartItem -> {
-                Product product = productMap.get(cartItem.getProductId());
-                if (product == null) {
-                    throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
-                }
-                return CartItemDto.of(cartItem, product);
+        return cartRepository.findByMemberId(memberId)
+            .map(cart -> {
+                List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+                
+                List<Long> productIds = cartItems.stream()
+                    .map(CartItem::getProductId)
+                    .toList();
+                    
+                java.util.Map<Long, Product> productMap = productRepository.findAllById(productIds).stream()
+                    .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+                    
+                List<CartItemDto> itemDtos = cartItems.stream()
+                    .map(cartItem -> {
+                        Product product = productMap.get(cartItem.getProductId());
+                        if (product == null) {
+                            throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+                        }
+                        return CartItemDto.of(cartItem, product);
+                    })
+                    .toList();
+                    
+                return CartResponse.of(cart.getId(), memberId, itemDtos);
             })
-            .toList();
-
-        return CartResponse.of(cart.getId(), memberId, itemDtos);
+            .orElseGet(() -> CartResponse.of(null, memberId, List.of()));
     }
 
     /**

@@ -206,4 +206,45 @@ class CartServiceTest {
         assertThat(cartItem1.getDeletedAt()).isNotNull();
         assertThat(cartItem2.getDeletedAt()).isNotNull();
     }
+
+    @Test
+    @DisplayName("기존 장바구니 목록을 정상적으로 조회한다.")
+    void getMyCart_ExistingCart() {
+        // given
+        Long memberId = 1L;
+        Cart cart = createCart(10L, memberId);
+        CartItem cartItem = createCartItem(1000L, cart, 100L, 2L);
+        Product product = createProduct(100L, "Test Product", 1000L, 10L);
+
+        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findAllByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productRepository.findAllById(List.of(100L))).thenReturn(List.of(product));
+
+        // when
+        CartResponse response = cartService.getMyCart(memberId);
+
+        // then
+        assertThat(response.cartId()).isEqualTo(cart.getId());
+        assertThat(response.items()).hasSize(1);
+        assertThat(response.items().get(0).productId()).isEqualTo(100L);
+        assertThat(response.items().get(0).productName()).isEqualTo("Test Product");
+        assertThat(response.items().get(0).quantity()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("장바구니 조회 시, 장바구니가 없으면 빈 결과를 반환한다.")
+    void getMyCart_NewCart() {
+        // given
+        Long memberId = 1L;
+
+        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.empty());
+
+        // when
+        CartResponse response = cartService.getMyCart(memberId);
+
+        // then
+        assertThat(response.cartId()).isNull();
+        assertThat(response.items()).isEmpty();
+        verify(cartRepository, never()).save(any(Cart.class));
+    }
 }
