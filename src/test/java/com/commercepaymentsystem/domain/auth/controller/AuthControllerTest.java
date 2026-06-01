@@ -33,7 +33,7 @@ class AuthControllerTest {
 		mockMvc.perform(post("/api/auth/logout"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.code").value("SUCCESS"))
-			.andExpect(jsonPath("$.message").doesNotExist())
+			.andExpect(jsonPath("$.message").value("요청 성공"))
 			.andExpect(jsonPath("$.data").doesNotExist());
 
 		verify(authService).logout();
