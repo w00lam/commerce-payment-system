@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.commercepaymentsystem.domain.auth.dto.LoginRequest;
+import com.commercepaymentsystem.domain.auth.dto.LoginResponse;
 import com.commercepaymentsystem.domain.auth.dto.SignupRequest;
 import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.auth.service.AuthService;
@@ -28,5 +30,10 @@ public class AuthController {
 		SignupResponse response = authService.signup(request);
 
 		return ApiResponse.ok(response);
+	}
+
+	@PostMapping("/login")
+	public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+		return ApiResponse.ok(authService.login(request));
 	}
 }
