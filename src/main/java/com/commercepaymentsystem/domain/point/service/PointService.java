@@ -57,12 +57,12 @@ public class PointService {
 		}
 
 		if (paymentId == null) {
-			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND, "결제 식별자는 필수입니다.");
+			throw new PointException(PointErrorCode.PAYMENT_ID_REQUIRED);
 		}
 
 		// 1. 비관적 락을 먼저 획득하여 동시성 제어 및 원자적 검증 환경 조성 (Lost Update 방지)
 		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
 
 		// 2. 락 획득 상태에서 멱등성 재검증 (중복 적립 방지)
 		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
@@ -77,12 +77,12 @@ public class PointService {
 
 	private Member findMemberById(Long memberId) {
 		return memberRepository.findById(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 
 	private void validateMemberExists(Long memberId) {
 		if (!memberRepository.existsById(memberId)) {
-			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
+			throw new PointException(MemberErrorCode.MEMBER_NOT_FOUND);
 		}
 	}
 }

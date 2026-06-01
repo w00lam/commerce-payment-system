@@ -27,6 +27,12 @@ public enum PointErrorCode implements ErrorCode {
 		HttpStatus.BAD_REQUEST,
 		"POINT_003",
 		"보유 포인트가 부족합니다."
+	),
+
+	PAYMENT_ID_REQUIRED(
+		HttpStatus.BAD_REQUEST,
+		"POINT_004",
+		"결제 식별자는 필수입니다."
 	);
 
 	private final HttpStatus status;

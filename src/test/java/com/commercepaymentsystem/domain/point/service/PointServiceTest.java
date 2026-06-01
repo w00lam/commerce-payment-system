@@ -122,9 +122,9 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
-			.isInstanceOf(BusinessException.class)
+			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
-			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+			.isEqualTo(PointErrorCode.PAYMENT_ID_REQUIRED);
 	}
 
 	@Test
@@ -154,7 +154,7 @@ class PointServiceTest {
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 BusinessException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 PointException이 발생한다.")
 	void getMyPoint_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -162,13 +162,13 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPoint(memberId))
-			.isInstanceOf(BusinessException.class)
+			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 BusinessException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 PointException이 발생한다.")
 	void getMyPointHistories_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -177,7 +177,7 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPointHistories(memberId, pageable))
-			.isInstanceOf(BusinessException.class)
+			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
