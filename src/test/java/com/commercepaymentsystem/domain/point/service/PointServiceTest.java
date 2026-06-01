@@ -78,7 +78,7 @@ class PointServiceTest {
 	}
 
 	@Test
-	@DisplayName("이미 적립된 결제 건에 대해 다시 적립을 시도하면 예외가 발생한다.")
+	@DisplayName("이미 적립된 결제 건에 대해 다시 적립을 시도하면 추가 적립 없이 리턴한다.")
 	void earnPoint_AlreadyEarned() {
 		// given
 		Long memberId = 1L;
@@ -89,11 +89,12 @@ class PointServiceTest {
 		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
 		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(true);
 
-		// when & then
-		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
-			.isInstanceOf(PointException.class)
-			.extracting("errorCode")
-			.isEqualTo(PointErrorCode.ALREADY_EARNED_POINT);
+		// when
+		pointService.earnPoint(memberId, amount, paymentId);
+
+		// then
+		verify(member, never()).addPoint(anyLong());
+		verify(pointHistoryRepository, never()).save(any(PointHistory.class));
 	}
 
 	@Test

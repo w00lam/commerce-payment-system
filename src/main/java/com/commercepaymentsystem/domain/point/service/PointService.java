@@ -54,8 +54,9 @@ public class PointService {
 
 		Member member = findMemberByIdWithLock(memberId);
 
+		// 멱등성 보장: 이미 적립된 경우 리턴 (리뷰 반영)
 		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
-			throw new PointException(PointErrorCode.ALREADY_EARNED_POINT);
+			return;
 		}
 
 		member.addPoint(amount);
@@ -71,6 +72,7 @@ public class PointService {
 
 		Member member = findMemberByIdWithLock(memberId);
 
+		// 멱등성 보장: 이미 차감된 경우 리턴
 		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)) {
 			return;
 		}
