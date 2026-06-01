@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "point_histories")
+@Table(
+	name = "point_histories",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_point_history_payment_type",
+			columnNames = {"payment_id", "type"}
+		)
+	}
+)
 public class PointHistory extends BaseEntity {
 
 	@Id

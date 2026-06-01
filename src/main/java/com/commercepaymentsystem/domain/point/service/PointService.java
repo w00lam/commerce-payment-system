@@ -48,6 +48,7 @@ public class PointService {
 
 	/**
 	 * 포인트 적립 (결제 완료 시 등)
+	 * 멱등성 보장을 위해 락 획득 후 중복 여부를 재검증함
 	 */
 	@Transactional
 	public void earnPoint(Long memberId, Long amount, Long paymentId) {
@@ -55,14 +56,14 @@ public class PointService {
 			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
 		}
 
-		// 멱등성 검사: 이미 적립된 건인지 확인
+		// 1. 비관적 락을 먼저 획득하여 동시성 제어 및 원자적 검증 환경 조성 (Lost Update 방지)
+		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+		// 2. 락 획득 상태에서 멱등성 재검증 (중복 적립 방지)
 		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
 			throw new PointException(PointErrorCode.ALREADY_EARNED_POINT);
 		}
-
-		// 비관적 락을 사용하여 동시성 제어 (Lost Update 방지)
-		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 
 		member.addPoint(amount);
 
