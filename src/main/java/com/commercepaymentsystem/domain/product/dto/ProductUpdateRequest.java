@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 
-public record ProductCreateRequest(
+public record ProductUpdateRequest(
     @NotBlank @Size(max = 100) String name,
     @NotNull @Min(0) Long price,
     @NotNull @Min(0) Long stock,

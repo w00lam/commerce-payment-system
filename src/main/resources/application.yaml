@@ -8,6 +8,11 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+
   jpa:
     open-in-view: false
     hibernate:
@@ -21,7 +26,7 @@ spring:
 
   sql:
     init:
-      mode: always  # data.sql 자동 실행
+      mode: never  # 운영/공용 환경에서는 data.sql 자동 실행 방지
 
   thymeleaf:
     cache: false
@@ -42,3 +47,12 @@ portone:
   store-id: ${PORTONE_STORE_ID}
   channel-key: ${PORTONE_CHANNEL_KEY}
   webhook-secret: ${PORTONE_WEBHOOK_SECRET}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  sql:
+    init:
+      mode: always  # local 환경에서만 샘플 데이터(data.sql) 실행
