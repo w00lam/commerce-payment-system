@@ -26,7 +26,6 @@ import org.hibernate.annotations.SQLRestriction;
  * 장바구니에 담긴 개별 상품(Item)을 나타내는 엔티티입니다.
  * Cart와 Product 간의 다대다 관계를 일대다-다대일로 풀어서 매핑합니다.
  */
-@SQLRestriction("deleted_at IS NULL")
 @Entity
 @Getter
 @Table(name = "cart_items", uniqueConstraints = {
@@ -53,9 +52,6 @@ public class CartItem extends BaseEntity {
     @Column(nullable = false, columnDefinition = "INT UNSIGNED")
     private Long quantity;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     /**
      * 정적 팩토리 메서드: 장바구니 상품을 생성합니다.
      * 유효하지 않은 수량(0 이하) 입력 시 예외를 발생시켜 객체 생성 자체를 차단합니다.
@@ -64,7 +60,7 @@ public class CartItem extends BaseEntity {
         if (quantity == null || quantity <= 0) {
             throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
         }
-        return new CartItem(null, cart, productId, quantity, null);
+        return new CartItem(null, cart, productId, quantity);
     }
 
     /**
@@ -85,12 +81,5 @@ public class CartItem extends BaseEntity {
             throw new BusinessException(CartErrorCode.INVALID_QUANTITY);
         }
         this.quantity = quantity;
-    }
-
-    /**
-     * 상품을 장바구니에서 삭제 처리(Soft Delete)합니다.
-     */
-    public void delete() {
-        this.deletedAt = LocalDateTime.now();
     }
 }

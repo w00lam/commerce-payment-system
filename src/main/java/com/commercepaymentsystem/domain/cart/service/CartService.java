@@ -19,8 +19,7 @@ import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.repository.CartItemRepository;
 import com.commercepaymentsystem.domain.cart.repository.CartRepository;
 import com.commercepaymentsystem.domain.product.entity.Product;
-import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
-import com.commercepaymentsystem.domain.product.repository.ProductRepository;
+import com.commercepaymentsystem.domain.product.service.ProductCommand;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,7 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
+    private final ProductCommand productCommand;
 
     /**
      * 장바구니에 상품을 담습니다.
@@ -50,8 +49,7 @@ public class CartService {
     @Transactional
     public CartItemAddResponse addCartItem(Long memberId, CartItemAddRequest request) {
         // 1. 상품 조회 (없으면 예외 발생)
-        Product product = productRepository.findById(request.productId())
-            .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Product product = productCommand.getProductForCart(request.productId());
 
         // 2. 내 장바구니 조회 (없으면 새로 생성)
         Cart cart = cartRepository.findByMemberId(memberId)
@@ -95,17 +93,18 @@ public class CartService {
                     .map(CartItem::getProductId)
                     .toList();
                     
-                java.util.Map<Long, Product> productMap = productRepository.findAllById(productIds).stream()
-                    .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+                java.util.Map<Long, Product> productMap = productCommand.getProductsForCart(productIds);
                     
                 List<CartItemDto> itemDtos = cartItems.stream()
                     .map(cartItem -> {
                         Product product = productMap.get(cartItem.getProductId());
                         if (product == null) {
-                            throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+                            // 상품이 삭제되었거나 존재하지 않는 경우 건너뜁니다.
+                            return null;
                         }
                         return CartItemDto.of(cartItem, product);
                     })
+                    .filter(java.util.Objects::nonNull)
                     .toList();
                     
                 return CartResponse.of(cart.getId(), memberId, itemDtos);
@@ -128,8 +127,7 @@ public class CartService {
         CartItem cartItem = cartItemRepository.findByIdAndMemberId(cartItemId, memberId)
             .orElseThrow(() -> new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND));
 
-        Product product = productRepository.findById(cartItem.getProductId())
-            .orElseThrow(() -> new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
+        Product product = productCommand.getProductForCart(cartItem.getProductId());
 
         if (product.getStock() < request.quantity()) {
             throw new BusinessException(CartErrorCode.OUT_OF_STOCK);
@@ -152,7 +150,7 @@ public class CartService {
         CartItem cartItem = cartItemRepository.findByIdAndMemberId(cartItemId, memberId)
             .orElseThrow(() -> new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND));
 
-        cartItem.delete();
+        cartItemRepository.delete(cartItem);
         return CartItemDeleteResponse.of(cartItem.getId());
     }
 
@@ -165,12 +163,11 @@ public class CartService {
      */
     @Transactional
     public CartClearResponse clearCart(Long memberId) {
-        Cart cart = cartRepository.findByMemberId(memberId)
-            .orElseGet(() -> cartRepository.save(Cart.create(memberId)));
-
-        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
-        cartItems.forEach(CartItem::delete);
-
-        return CartClearResponse.of(cart.getId());
+        return cartRepository.findByMemberId(memberId)
+            .map(cart -> {
+                cartItemRepository.deleteAll(cartItemRepository.findAllByCartId(cart.getId()));
+                return CartClearResponse.of(cart.getId());
+            })
+            .orElseGet(() -> CartClearResponse.of(null));
     }
 }

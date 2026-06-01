@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -32,8 +33,7 @@ import com.commercepaymentsystem.domain.cart.repository.CartRepository;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
-import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
-import com.commercepaymentsystem.domain.product.repository.ProductRepository;
+import com.commercepaymentsystem.domain.product.service.ProductCommand;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,7 +46,7 @@ class CartServiceTest {
     private CartItemRepository cartItemRepository;
 
     @Mock
-    private ProductRepository productRepository;
+    private ProductCommand productCommand;
 
     @InjectMocks
     private CartService cartService;
@@ -82,7 +82,7 @@ class CartServiceTest {
         Cart cart = createCart(10L, memberId);
         CartItem savedItem = createCartItem(1000L, cart, productId, quantity);
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(productCommand.getProductForCart(productId)).thenReturn(product);
         when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.empty());
         when(cartItemRepository.save(any(CartItem.class))).thenReturn(savedItem);
@@ -110,7 +110,7 @@ class CartServiceTest {
         Cart cart = createCart(10L, memberId);
         CartItem existingItem = createCartItem(1000L, cart, productId, existingQuantity);
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(productCommand.getProductForCart(productId)).thenReturn(product);
         when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.of(existingItem));
 
@@ -133,7 +133,7 @@ class CartServiceTest {
         Product product = createProduct(productId, "Test Product", 1000L, 10L);
         Cart cart = createCart(10L, memberId);
 
-        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(productCommand.getProductForCart(productId)).thenReturn(product);
         when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.empty());
 
@@ -158,7 +158,7 @@ class CartServiceTest {
         Product product = createProduct(productId, "Test Product", 1000L, 10L);
 
         when(cartItemRepository.findByIdAndMemberId(cartItemId, memberId)).thenReturn(Optional.of(cartItem));
-        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(productCommand.getProductForCart(productId)).thenReturn(product);
 
         // when
         CartItemUpdateResponse response = cartService.updateCartItemQuantity(memberId, cartItemId, request);
@@ -183,7 +183,7 @@ class CartServiceTest {
 
         // then
         assertThat(response.cartItemId()).isEqualTo(cartItemId);
-        assertThat(cartItem.getDeletedAt()).isNotNull();
+        verify(cartItemRepository).delete(cartItem);
     }
 
     @Test
@@ -203,8 +203,7 @@ class CartServiceTest {
 
         // then
         assertThat(response.cartId()).isEqualTo(cart.getId());
-        assertThat(cartItem1.getDeletedAt()).isNotNull();
-        assertThat(cartItem2.getDeletedAt()).isNotNull();
+        verify(cartItemRepository).deleteAll(anyList());
     }
 
     @Test
@@ -218,7 +217,7 @@ class CartServiceTest {
 
         when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findAllByCartId(cart.getId())).thenReturn(List.of(cartItem));
-        when(productRepository.findAllById(List.of(100L))).thenReturn(List.of(product));
+        when(productCommand.getProductsForCart(List.of(100L))).thenReturn(Map.of(100L, product));
 
         // when
         CartResponse response = cartService.getMyCart(memberId);
