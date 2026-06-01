@@ -15,6 +15,12 @@ public enum PointErrorCode implements ErrorCode {
 		HttpStatus.BAD_REQUEST,
 		"POINT_001",
 		"포인트 금액은 0보다 커야 합니다."
+	),
+
+	ALREADY_EARNED_POINT(
+		HttpStatus.CONFLICT,
+		"POINT_002",
+		"이미 해당 결제에 대해 포인트가 적립되었습니다."
 	);
 
 	private final HttpStatus status;

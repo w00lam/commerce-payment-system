@@ -55,7 +55,15 @@ public class PointService {
 			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
 		}
 
-		Member member = findMemberById(memberId);
+		// 멱등성 검사: 이미 적립된 건인지 확인
+		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
+			throw new PointException(PointErrorCode.ALREADY_EARNED_POINT);
+		}
+
+		// 비관적 락을 사용하여 동시성 제어 (Lost Update 방지)
+		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+
 		member.addPoint(amount);
 
 		PointHistory history = new PointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
