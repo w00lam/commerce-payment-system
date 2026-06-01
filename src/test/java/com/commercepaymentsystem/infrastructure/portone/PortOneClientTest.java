@@ -35,6 +35,8 @@ class PortOneClientTest {
 		PortOneProperties properties = new PortOneProperties(
 			"https://api.portone.test",
 			"test-api-secret",
+			"test-store-id",
+			"test-channel-key",
 			Duration.ofSeconds(1),
 			Duration.ofSeconds(3)
 		);

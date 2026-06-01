@@ -26,4 +26,5 @@ portone:
   api-secret: "test_api_secret"
   store-id: "test_store_id"
   channel-key: "test_channel_key"
-  webhook-secret: "test_webhook_secret"
+  connect-timeout: 1s
+  read-timeout: 3s
