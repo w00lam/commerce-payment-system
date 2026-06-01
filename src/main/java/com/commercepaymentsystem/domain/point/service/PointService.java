@@ -56,6 +56,10 @@ public class PointService {
 			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
 		}
 
+		if (paymentId == null) {
+			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND, "결제 식별자는 필수입니다.");
+		}
+
 		// 1. 비관적 락을 먼저 획득하여 동시성 제어 및 원자적 검증 환경 조성 (Lost Update 방지)
 		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
 			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));

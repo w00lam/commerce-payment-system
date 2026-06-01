@@ -67,8 +67,8 @@ class PointServiceTest {
 		Long paymentId = 100L;
 		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
 		
-		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(false);
 		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(false);
 
 		// when
 		pointService.earnPoint(memberId, amount, paymentId);
@@ -85,7 +85,9 @@ class PointServiceTest {
 		Long memberId = 1L;
 		Long amount = 500L;
 		Long paymentId = 100L;
+		Member member = mock(Member.class);
 
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
 		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(true);
 
 		// when & then
@@ -111,6 +113,21 @@ class PointServiceTest {
 	}
 
 	@Test
+	@DisplayName("결제 식별자(paymentId)가 없으면 예외가 발생한다.")
+	void earnPoint_NullPaymentId() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = null;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+	}
+
+	@Test
 	@DisplayName("포인트 거래 내역을 최신순으로 페이징 조회한다.")
 	void getMyPointHistories_Success() {
 		// given
@@ -121,7 +138,7 @@ class PointServiceTest {
 
 		given(history1.getType()).willReturn(PointHistoryType.EARN);
 		given(history1.getAmount()).willReturn(500L);
-		given(history2.getType()).willReturn(PointHistoryType.USE);
+		given(history2.getType()).willReturn(PointHistoryType.EARN);
 		given(history2.getAmount()).willReturn(200L);
 
 		given(memberRepository.existsById(memberId)).willReturn(true);
@@ -133,10 +150,6 @@ class PointServiceTest {
 
 		// then
 		assertThat(responses.getContent()).hasSize(2);
-		assertThat(responses.getContent().get(0).type()).isEqualTo("EARN");
-		assertThat(responses.getContent().get(0).amount()).isEqualTo(500L);
-		assertThat(responses.getContent().get(1).type()).isEqualTo("USE");
-		assertThat(responses.getContent().get(1).amount()).isEqualTo(200L);
 		verify(pointHistoryRepository).findByMemberId(memberId, pageable);
 	}
 

@@ -26,6 +26,7 @@ public class PointHistory extends BaseEntity {
 
 	private Long memberId;
 
+	@Column(nullable = false)
 	private Long paymentId;
 
 	@Enumerated(EnumType.STRING)
