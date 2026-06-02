@@ -1,4 +1,4 @@
-package com.commercepaymentsystem.infrastructure.portone;
+package com.commercepaymentsystem.infrastructure.portone.config;
 
 import java.time.Duration;
 
