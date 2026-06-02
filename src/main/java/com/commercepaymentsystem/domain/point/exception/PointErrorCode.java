@@ -27,6 +27,12 @@ public enum PointErrorCode implements ErrorCode {
 		HttpStatus.NOT_FOUND,
 		"POINT_003",
 		"원본 차감 내역을 찾을 수 없어 복구가 불가능합니다."
+	),
+
+	REFUND_ID_REQUIRED(
+		HttpStatus.BAD_REQUEST,
+		"POINT_004",
+		"환불 식별자는 필수입니다."
 	);
 
 	private final HttpStatus status;

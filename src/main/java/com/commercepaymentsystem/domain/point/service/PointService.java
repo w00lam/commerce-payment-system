@@ -88,7 +88,7 @@ public class PointService {
 	 */
 	@Transactional
 	public void restorePoint(Long memberId, Long amount, Long paymentId, Long refundId) {
-		validatePointRequest(amount, paymentId);
+		validateRestoreRequest(amount, paymentId, refundId);
 
 		Member member = findMemberByIdWithLock(memberId);
 
@@ -112,6 +112,13 @@ public class PointService {
 		}
 		if (paymentId == null) {
 			throw pointException(PointErrorCode.PAYMENT_ID_REQUIRED);
+		}
+	}
+
+	private void validateRestoreRequest(Long amount, Long paymentId, Long refundId) {
+		validatePointRequest(amount, paymentId);
+		if (refundId == null) {
+			throw pointException(PointErrorCode.REFUND_ID_REQUIRED);
 		}
 	}
 

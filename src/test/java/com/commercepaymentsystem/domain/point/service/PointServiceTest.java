@@ -254,6 +254,22 @@ class PointServiceTest {
 	}
 
 	@Test
+	@DisplayName("환불 식별자(refundId)가 없으면 PointException이 발생한다.")
+	void restorePoint_NullRefundId() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Long refundId = null;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.restorePoint(memberId, amount, paymentId, refundId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.REFUND_ID_REQUIRED);
+	}
+
+	@Test
 	@DisplayName("포인트 거래 내역을 최신순으로 페이징 조회한다.")
 	void getMyPointHistories_Success() {
 		// given
