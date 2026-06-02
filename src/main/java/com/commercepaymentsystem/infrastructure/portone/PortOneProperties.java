@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record PortOneProperties(
 	String baseUrl,
 	String apiSecret,
+	String storeId,
+	String channelKey,
 	Duration connectTimeout,
 	Duration readTimeout
 ) {

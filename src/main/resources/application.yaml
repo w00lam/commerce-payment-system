@@ -46,7 +46,8 @@ portone:
   api-secret: ${PORTONE_API_SECRET}
   store-id: ${PORTONE_STORE_ID}
   channel-key: ${PORTONE_CHANNEL_KEY}
-  webhook-secret: ${PORTONE_WEBHOOK_SECRET}
+  connect-timeout: ${PORTONE_CONNECT_TIMEOUT:2s}
+  read-timeout: ${PORTONE_READ_TIMEOUT:5s}
 
 ---
 spring:

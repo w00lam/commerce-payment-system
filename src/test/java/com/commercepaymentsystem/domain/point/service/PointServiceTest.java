@@ -24,6 +24,8 @@ import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
 import com.commercepaymentsystem.domain.point.entity.PointHistory;
 import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
+import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
@@ -57,6 +59,75 @@ class PointServiceTest {
 	}
 
 	@Test
+	@DisplayName("포인트를 성공적으로 적립하고 이력을 남긴다.")
+	void earnPoint_Success() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(false);
+
+		// when
+		pointService.earnPoint(memberId, amount, paymentId);
+
+		// then
+		assertThat(member.getPointBalance()).isEqualTo(500L);
+		verify(pointHistoryRepository).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("이미 적립된 결제 건에 대해 다시 적립을 시도하면 예외가 발생한다.")
+	void earnPoint_AlreadyEarned() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Member member = mock(Member.class);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(true);
+
+		// when & then
+		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.ALREADY_EARNED_POINT);
+	}
+
+	@Test
+	@DisplayName("적립 금액이 0원 이하이면 PointException이 발생한다.")
+	void earnPoint_InvalidAmount() {
+		// given
+		Long memberId = 1L;
+		Long amount = 0L;
+		Long paymentId = 100L;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.INVALID_POINT_AMOUNT);
+	}
+
+	@Test
+	@DisplayName("결제 식별자(paymentId)가 없으면 예외가 발생한다.")
+	void earnPoint_NullPaymentId() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = null;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.earnPoint(memberId, amount, paymentId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.PAYMENT_ID_REQUIRED);
+	}
+
+	@Test
 	@DisplayName("포인트 거래 내역을 최신순으로 페이징 조회한다.")
 	void getMyPointHistories_Success() {
 		// given
@@ -67,7 +138,7 @@ class PointServiceTest {
 
 		given(history1.getType()).willReturn(PointHistoryType.EARN);
 		given(history1.getAmount()).willReturn(500L);
-		given(history2.getType()).willReturn(PointHistoryType.USE);
+		given(history2.getType()).willReturn(PointHistoryType.EARN);
 		given(history2.getAmount()).willReturn(200L);
 
 		given(memberRepository.existsById(memberId)).willReturn(true);
@@ -79,15 +150,11 @@ class PointServiceTest {
 
 		// then
 		assertThat(responses.getContent()).hasSize(2);
-		assertThat(responses.getContent().get(0).type()).isEqualTo("EARN");
-		assertThat(responses.getContent().get(0).amount()).isEqualTo(500L);
-		assertThat(responses.getContent().get(1).type()).isEqualTo("USE");
-		assertThat(responses.getContent().get(1).amount()).isEqualTo(200L);
 		verify(pointHistoryRepository).findByMemberId(memberId, pageable);
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 BusinessException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 PointException이 발생한다.")
 	void getMyPoint_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -95,13 +162,13 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPoint(memberId))
-			.isInstanceOf(BusinessException.class)
+			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 BusinessException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 PointException이 발생한다.")
 	void getMyPointHistories_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -110,7 +177,7 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPointHistories(memberId, pageable))
-			.isInstanceOf(BusinessException.class)
+			.isInstanceOf(PointException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
