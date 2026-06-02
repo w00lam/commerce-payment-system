@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
+import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.service.OrderService;
@@ -20,6 +22,14 @@ import lombok.RequiredArgsConstructor;
 public class OrderController {
 
 	private final OrderService orderService;
+
+	@PostMapping
+	public ApiResponse<OrderCreateResponse> createOrder(
+		@AuthenticationPrincipal Long memberId,
+		@Valid @RequestBody OrderCreateRequest request
+	) {
+		return ApiResponse.ok(orderService.createOrder(memberId, request));
+	}
 
 	@PostMapping("/preview")
 	public ApiResponse<OrderPreviewResponse> previewOrder(
