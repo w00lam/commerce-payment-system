@@ -27,7 +27,15 @@ public enum ProductErrorCode implements ErrorCode {
 		HttpStatus.BAD_REQUEST,
 		"PRODUCT_002",
 		"상품의 재고가 부족합니다."
+	),
+
+	PRODUCT_NOT_ON_SALE(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_004",
+		"판매 중인 상품이 아닙니다."
 	);
+
+
 
 	private final HttpStatus status;
 	private final String code;
