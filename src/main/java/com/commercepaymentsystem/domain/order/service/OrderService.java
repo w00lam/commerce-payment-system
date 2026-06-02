@@ -9,12 +9,25 @@ import org.springframework.transaction.annotation.Transactional;
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.service.CartItemCommand;
+import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.service.MemberCommand;
+import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
+import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewItemResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
+import com.commercepaymentsystem.domain.order.entity.Order;
+import com.commercepaymentsystem.domain.order.entity.OrderItem;
+import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
+import com.commercepaymentsystem.domain.order.mapper.OrderCreateMapper;
 import com.commercepaymentsystem.domain.order.mapper.OrderPreviewMapper;
+import com.commercepaymentsystem.domain.order.repository.OrderItemRepository;
+import com.commercepaymentsystem.domain.order.repository.OrderRepository;
+import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
+import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
+import com.commercepaymentsystem.domain.payment.service.PaymentService;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
@@ -30,6 +43,104 @@ public class OrderService {
 	private final MemberCommand memberCommand;
 	private final CartItemCommand cartItemCommand;
 	private final ProductCommand productCommand;
+	private final CartService cartService;
+	private final OrderRepository orderRepository;
+	private final OrderItemRepository orderItemRepository;
+	private final OrderNumberGenerator orderNumberGenerator;
+	private final PaymentService paymentService;
+
+	/**
+	 * 장바구니 상품을 기준으로 주문과 결제 대기 정보를 생성합니다.
+	 *
+	 * <p>cartItemIds가 비어 있으면 회원의 전체 장바구니 상품을 주문 대상으로 사용합니다.
+	 * cartItemIds가 있으면 해당 장바구니 상품만 주문 대상으로 사용합니다.
+	 * 상품 상태와 재고를 검증한 뒤 포인트와 재고를 차감하고,
+	 * 주문, 주문 상품, 결제 대기 정보를 생성합니다.</p>
+	 *
+	 * <p>주문 생성이 완료되면 장바구니를 비웁니다.
+	 * 중간에 예외가 발생하면 전체 트랜잭션이 롤백됩니다.</p>
+	 *
+	 * @param memberId 회원 ID
+	 * @param request 주문 생성 요청
+	 * @return 주문 생성 응답
+	 */
+	@Transactional
+	public OrderCreateResponse createOrder(
+		Long memberId,
+		OrderCreateRequest request
+	) {
+		Member member = memberCommand.getMember(memberId);
+
+		List<CartItem> cartItems = findPreviewCartItems(
+			member.getId(),
+			request.cartItemIds()
+		);
+
+		if (cartItems.isEmpty()) {
+			throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEM);
+		}
+
+		Map<Long, Product> productMap = findProductMap(cartItems);
+
+		validateAllProductsExist(
+			cartItems,
+			productMap
+		);
+
+		validateOrderableProduct(
+			cartItems,
+			productMap
+		);
+
+		Long totalAmount = calculateTotalAmount(
+			cartItems,
+			productMap
+		);
+
+		Long usedPointAmount = request.safeUsedPointAmount();
+
+		validateUsedPointAmount(
+			totalAmount,
+			usedPointAmount
+		);
+
+		usePointIfRequested(
+			member,
+			usedPointAmount
+		);
+
+		decreaseProductStock(
+			cartItems,
+			productMap
+		);
+
+		Order order = saveOrder(
+			member,
+			totalAmount,
+			usedPointAmount
+		);
+
+		List<OrderItem> orderItems = saveOrderItems(
+			order,
+			cartItems,
+			productMap
+		);
+
+		PaymentCreateResult payment = createReadyPayment(
+			member.getId(),
+			order.getId(),
+			totalAmount,
+			usedPointAmount
+		);
+
+		cartService.clearCart(member.getId());
+
+		return OrderCreateMapper.toResponse(
+			order,
+			payment,
+			orderItems
+		);
+	}
 
 	/**
 	 * 주문서 미리보기 정보를 조회합니다.
@@ -64,6 +175,11 @@ public class OrderService {
 
 		Map<Long, Product> productMap = findProductMap(cartItems);
 
+		validateAllProductsExist(
+			cartItems,
+			productMap
+		);
+
 		validateOrderableProduct(
 			cartItems,
 			productMap
@@ -92,15 +208,15 @@ public class OrderService {
 	}
 
 	/**
-	 * 주문서 미리보기에 사용할 장바구니 상품 목록을 조회합니다.
+	 * 주문서 미리보기와 주문 생성에 사용할 장바구니 상품 목록을 조회합니다.
 	 *
 	 * <p>cartItemIds가 비어 있으면 회원의 전체 장바구니 상품을 조회하고,
 	 * 값이 있으면 중복을 제거한 뒤 해당 ID 목록에 포함된 장바구니 상품만 조회합니다.
-	 * 선택 상품 미리보기 요청에서 존재하지 않는 장바구니 상품 ID가 포함되면 예외를 발생시킵니다.</p>
+	 * 존재하지 않거나 본인 장바구니 상품이 아닌 ID가 포함되면 예외를 발생시킵니다.</p>
 	 *
 	 * @param memberId 검증된 회원 ID
 	 * @param cartItemIds 장바구니 상품 ID 목록
-	 * @return 주문서 미리보기에 사용할 장바구니 상품 목록
+	 * @return 장바구니 상품 목록
 	 */
 	private List<CartItem> findPreviewCartItems(
 		Long memberId,
@@ -152,10 +268,27 @@ public class OrderService {
 	}
 
 	/**
+	 * 장바구니 상품에 연결된 모든 상품이 존재하는지 검증합니다.
+	 *
+	 * @param cartItems 장바구니 상품 목록
+	 * @param productMap 상품 ID를 key로 갖는 상품 Map
+	 */
+	private void validateAllProductsExist(
+		List<CartItem> cartItems,
+		Map<Long, Product> productMap
+	) {
+		int productCount = extractDistinctProductIds(cartItems).size();
+
+		if (productMap.size() != productCount) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+		}
+	}
+
+	/**
 	 * 상품이 주문 가능한 상태인지 검증합니다.
 	 *
 	 * <p>판매 중인 상품인지 확인하고, 장바구니 수량보다 재고가 충분한지 검증합니다.
-	 * 이 메서드는 재고를 차감하지 않고, 주문 가능 여부만 확인합니다.</p>
+	 * 이 메서드는 재고를 차감하지 않고 주문 가능 여부만 확인합니다.</p>
 	 *
 	 * @param cartItems 장바구니 상품 목록
 	 * @param productMap 상품 ID를 key로 갖는 상품 Map
@@ -199,6 +332,10 @@ public class OrderService {
 		Product product,
 		Long quantity
 	) {
+		if (quantity == null || quantity <= 0) {
+			throw new BusinessException(ProductErrorCode.INVALID_QUANTITY);
+		}
+
 		if (product.getStock() < quantity) {
 			throw new BusinessException(ProductErrorCode.OUT_OF_STOCK);
 		}
@@ -225,6 +362,154 @@ public class OrderService {
 				return product.getPrice() * cartItem.getQuantity();
 			})
 			.sum();
+	}
+
+	/**
+	 * 사용 포인트 금액을 검증합니다.
+	 *
+	 * <p>사용 포인트는 음수일 수 없고, 주문 총액을 초과할 수 없습니다.
+	 * 실제 보유 포인트 부족 여부는 Member.usePoint()에서 검증합니다.</p>
+	 *
+	 * @param totalAmount 총 주문 금액
+	 * @param usedPointAmount 사용 포인트 금액
+	 */
+	private void validateUsedPointAmount(
+		Long totalAmount,
+		Long usedPointAmount
+	) {
+		if (usedPointAmount == null || usedPointAmount < 0) {
+			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT);
+		}
+
+		if (usedPointAmount > totalAmount) {
+			throw new BusinessException(PointErrorCode.INSUFFICIENT_POINT);
+		}
+	}
+
+	/**
+	 * 사용 포인트가 있으면 회원 포인트를 차감합니다.
+	 *
+	 * <p>포인트 잔액 부족 여부는 Member.usePoint()에서 검증합니다.</p>
+	 *
+	 * @param member 회원
+	 * @param usedPointAmount 사용 포인트 금액
+	 */
+	private void usePointIfRequested(
+		Member member,
+		Long usedPointAmount
+	) {
+		if (usedPointAmount == 0) {
+			return;
+		}
+
+		member.usePoint(usedPointAmount);
+	}
+
+	/**
+	 * 상품 재고를 주문 수량만큼 차감합니다.
+	 *
+	 * <p>재고 차감은 Product 엔티티의 removeStock 메서드에 위임합니다.
+	 * removeStock 내부에서 수량 검증, 재고 부족 검증, 재고 0 도달 시 상태 변경을 처리합니다.</p>
+	 *
+	 * @param cartItems 장바구니 상품 목록
+	 * @param productMap 상품 ID를 key로 갖는 상품 Map
+	 */
+	private void decreaseProductStock(
+		List<CartItem> cartItems,
+		Map<Long, Product> productMap
+	) {
+		for (CartItem cartItem : cartItems) {
+			Product product = getProduct(
+				productMap,
+				cartItem.getProductId()
+			);
+
+			product.removeStock(cartItem.getQuantity());
+		}
+	}
+
+	/**
+	 * 주문 정보를 저장합니다.
+	 *
+	 * @param member 회원
+	 * @param totalAmount 총 주문 금액
+	 * @param usedPointAmount 사용 포인트 금액
+	 * @return 저장된 주문
+	 */
+	private Order saveOrder(
+		Member member,
+		Long totalAmount,
+		Long usedPointAmount
+	) {
+		Order order = Order.create(
+			member,
+			orderNumberGenerator.generate(),
+			totalAmount,
+			usedPointAmount
+		);
+
+		return orderRepository.save(order);
+	}
+
+	/**
+	 * 주문 상품 정보를 저장합니다.
+	 *
+	 * @param order 주문
+	 * @param cartItems 장바구니 상품 목록
+	 * @param productMap 상품 ID를 key로 갖는 상품 Map
+	 * @return 저장된 주문 상품 목록
+	 */
+	private List<OrderItem> saveOrderItems(
+		Order order,
+		List<CartItem> cartItems,
+		Map<Long, Product> productMap
+	) {
+		List<OrderItem> orderItems = cartItems.stream()
+			.map(cartItem -> {
+				Product product = getProduct(
+					productMap,
+					cartItem.getProductId()
+				);
+
+				return OrderItem.create(
+					order,
+					product.getId(),
+					product.getName(),
+					product.getPrice(),
+					cartItem.getQuantity()
+				);
+			})
+			.toList();
+
+		return orderItemRepository.saveAll(orderItems);
+	}
+
+	/**
+	 * 결제 대기 정보를 생성합니다.
+	 *
+	 * @param memberId 회원 ID
+	 * @param orderId 주문 ID
+	 * @param totalAmount 총 주문 금액
+	 * @param usedPointAmount 사용 포인트 금액
+	 * @return 생성된 결제 정보
+	 */
+	private PaymentCreateResult createReadyPayment(
+		Long memberId,
+		Long orderId,
+		Long totalAmount,
+		Long usedPointAmount
+	) {
+		Long finalPaymentAmount = totalAmount - usedPointAmount;
+
+		PaymentCreateCommand command = new PaymentCreateCommand(
+			memberId,
+			orderId,
+			totalAmount,
+			usedPointAmount,
+			finalPaymentAmount
+		);
+
+		return paymentService.createPendingPayment(command);
 	}
 
 	/**
