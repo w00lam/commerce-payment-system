@@ -1,4 +1,4 @@
-package com.commercepaymentsystem.infrastructure.portone;
+package com.commercepaymentsystem.infrastructure.portone.config;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

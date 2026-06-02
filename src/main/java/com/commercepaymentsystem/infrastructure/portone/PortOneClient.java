@@ -8,7 +8,12 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
-import com.commercepaymentsystem.infrastructure.portone.exception.PortOneAuthenticationException;
+import com.commercepaymentsystem.infrastructure.portone.config.PortOneProperties;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelRequest;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelResponse;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmRequest;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmResponse;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOnePaymentVerificationException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneRetryableException;
@@ -24,39 +29,11 @@ public class PortOneClient {
 		this.properties = properties;
 	}
 
-	public String issueAccessToken() {
-		try {
-			// PortOne V2 인증이 필요한 결제 API 호출 전에 API Secret으로 access token을 발급받는다.
-			PortOneAccessTokenResponse response = restClient.post()
-				.uri("/login/api-secret")
-				.body(new PortOneAccessTokenRequest(properties.apiSecret()))
-				.retrieve()
-				.body(PortOneAccessTokenResponse.class);
-
-			if (response == null || isBlank(response.accessToken())) {
-				throw new PortOneAuthenticationException("PortOne 인증 실패: access token 응답이 비어 있습니다.");
-			}
-
-			return response.accessToken();
-		} catch (RestClientResponseException exception) {
-			throw convertAuthenticationException(exception);
-		} catch (ResourceAccessException exception) {
-			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 인증 요청에 실패했습니다.", exception);
-		} catch (PortOneAuthenticationException | PortOneRetryableException exception) {
-			throw exception;
-		} catch (RestClientException exception) {
-			throw new PortOneAuthenticationException("PortOne 인증 실패: 응답을 해석할 수 없습니다.", exception);
-		}
-	}
-
 	public PortOnePaymentResponse getPayment(String paymentId) {
-		String accessToken = issueAccessToken();
-
 		try {
-			// 이후 결제 검증에 사용할 PortOne 외부 결제 단건 조회 응답을 가져온다.
 			PortOnePaymentResponse response = restClient.get()
 				.uri("/payments/{paymentId}", paymentId)
-				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
 				.retrieve()
 				.body(PortOnePaymentResponse.class);
 
@@ -81,34 +58,121 @@ public class PortOneClient {
 		}
 	}
 
-	private PortOneException convertAuthenticationException(RestClientResponseException exception) {
-		HttpStatusCode statusCode = exception.getStatusCode();
+	public PortOnePaymentConfirmResponse confirmPayment(String paymentId, PortOnePaymentConfirmRequest request) {
+		try {
+			PortOnePaymentConfirmResponse response = restClient.post()
+				.uri("/payments/{paymentId}/confirm", paymentId)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.body(PortOnePaymentConfirmBody.from(properties.storeId(), request))
+				.retrieve()
+				.body(PortOnePaymentConfirmResponse.class);
 
-		// PortOne 서버 오류는 재시도 가능하지만, 그 외 인증 실패는 설정 확인이 필요하다.
-		if (statusCode.is5xxServerError()) {
-			return new PortOneRetryableException("PortOne 재시도 가능 오류: 인증 요청에 실패했습니다.", exception);
+			if (response == null || response.transaction() == null) {
+				throw new PortOnePaymentVerificationException(
+					"PortOne 결제 승인 실패: 승인 응답이 비어 있습니다."
+				);
+			}
+
+			return response;
+		} catch (RestClientResponseException exception) {
+			throw convertPaymentException(exception, "결제 승인");
+		} catch (ResourceAccessException exception) {
+			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 결제 승인 요청에 실패했습니다.", exception);
+		} catch (PortOnePaymentVerificationException | PortOneRetryableException exception) {
+			throw exception;
+		} catch (RestClientException exception) {
+			throw new PortOnePaymentVerificationException(
+				"PortOne 결제 승인 실패: 응답을 해석할 수 없습니다.",
+				exception
+			);
 		}
+	}
 
-		return new PortOneAuthenticationException("PortOne 인증 실패", exception);
+	public PortOnePaymentCancelResponse cancelPayment(String paymentId, PortOnePaymentCancelRequest request) {
+		try {
+			PortOnePaymentCancelResponse response = restClient.post()
+				.uri("/payments/{paymentId}/cancel", paymentId)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.body(PortOnePaymentCancelBody.from(properties.storeId(), request))
+				.retrieve()
+				.body(PortOnePaymentCancelResponse.class);
+
+			if (response == null || response.cancellation() == null) {
+				throw new PortOnePaymentVerificationException(
+					"PortOne 결제 취소 실패: 취소 응답이 비어 있습니다."
+				);
+			}
+
+			return response;
+		} catch (RestClientResponseException exception) {
+			throw convertPaymentException(exception, "결제 취소");
+		} catch (ResourceAccessException exception) {
+			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 결제 취소 요청에 실패했습니다.", exception);
+		} catch (PortOnePaymentVerificationException | PortOneRetryableException exception) {
+			throw exception;
+		} catch (RestClientException exception) {
+			throw new PortOnePaymentVerificationException(
+				"PortOne 결제 취소 실패: 응답을 해석할 수 없습니다.",
+				exception
+			);
+		}
 	}
 
 	private PortOneException convertPaymentException(RestClientResponseException exception) {
+		return convertPaymentException(exception, "결제 조회");
+	}
+
+	private PortOneException convertPaymentException(RestClientResponseException exception, String operationName) {
 		HttpStatusCode statusCode = exception.getStatusCode();
 
-		// 일시적인 외부 장애와 확정적인 결제 검증 실패를 구분한다.
 		if (statusCode.is5xxServerError()) {
-			return new PortOneRetryableException("PortOne 재시도 가능 오류: 결제 조회 요청에 실패했습니다.", exception);
+			return new PortOneRetryableException("PortOne 재시도 가능 오류: " + operationName + " 요청에 실패했습니다.", exception);
 		}
 
-		return new PortOnePaymentVerificationException("PortOne 결제 조회 실패", exception);
+		return new PortOnePaymentVerificationException("PortOne " + operationName + " 실패", exception);
 	}
 
 	private boolean isBlank(String value) {
 		return value == null || value.isBlank();
 	}
 
-	private record PortOneAccessTokenRequest(
-		String apiSecret
+	private String authorizationHeader() {
+		return "PortOne " + properties.apiSecret();
+	}
+
+	private record PortOnePaymentConfirmBody(
+		String storeId,
+		String paymentToken,
+		String txId,
+		Long totalAmount
 	) {
+
+		private static PortOnePaymentConfirmBody from(String storeId, PortOnePaymentConfirmRequest request) {
+			return new PortOnePaymentConfirmBody(
+				storeId,
+				request.paymentToken(),
+				request.txId(),
+				request.totalAmount()
+			);
+		}
+	}
+
+	private record PortOnePaymentCancelBody(
+		String storeId,
+		Long amount,
+		Long taxFreeAmount,
+		String reason,
+		String requester
+	) {
+
+		private static PortOnePaymentCancelBody from(String storeId, PortOnePaymentCancelRequest request) {
+			return new PortOnePaymentCancelBody(
+				storeId,
+				request.amount(),
+				request.taxFreeAmount(),
+				request.reason(),
+				request.requester()
+			);
+		}
 	}
 }
