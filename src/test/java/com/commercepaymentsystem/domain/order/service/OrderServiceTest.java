@@ -24,6 +24,7 @@ import com.commercepaymentsystem.domain.member.service.MemberCommand;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.product.entity.Product;
+import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
 import com.commercepaymentsystem.domain.product.service.ProductCommand;
 import com.commercepaymentsystem.global.exception.BusinessException;
@@ -57,12 +58,14 @@ class OrderServiceTest {
 		when(macbook.getName()).thenReturn("맥북 프로 16인치");
 		when(macbook.getPrice()).thenReturn(3500000L);
 		when(macbook.getStock()).thenReturn(10L);
+		when(macbook.getStatus()).thenReturn(ProductStatus.ON_SALE);
 
 		Product iphone = mock(Product.class);
 		when(iphone.getId()).thenReturn(2L);
 		when(iphone.getName()).thenReturn("아이폰 15 프로");
 		when(iphone.getPrice()).thenReturn(1500000L);
 		when(iphone.getStock()).thenReturn(50L);
+		when(iphone.getStatus()).thenReturn(ProductStatus.ON_SALE);
 
 		CartItem macbookCartItem = mock(CartItem.class);
 		when(macbookCartItem.getId()).thenReturn(1L);
@@ -122,12 +125,14 @@ class OrderServiceTest {
 		when(macbook.getName()).thenReturn("맥북 프로 16인치");
 		when(macbook.getPrice()).thenReturn(3500000L);
 		when(macbook.getStock()).thenReturn(10L);
+		when(macbook.getStatus()).thenReturn(ProductStatus.ON_SALE);
 
 		Product iphone = mock(Product.class);
 		when(iphone.getId()).thenReturn(2L);
 		when(iphone.getName()).thenReturn("아이폰 15 프로");
 		when(iphone.getPrice()).thenReturn(1500000L);
 		when(iphone.getStock()).thenReturn(50L);
+		when(iphone.getStatus()).thenReturn(ProductStatus.ON_SALE);
 
 		CartItem cartItem1 = mock(CartItem.class);
 		when(cartItem1.getId()).thenReturn(1L);
@@ -178,6 +183,7 @@ class OrderServiceTest {
 		when(macbook.getName()).thenReturn("맥북 프로 16인치");
 		when(macbook.getPrice()).thenReturn(3500000L);
 		when(macbook.getStock()).thenReturn(10L);
+		when(macbook.getStatus()).thenReturn(ProductStatus.ON_SALE);
 
 		CartItem cartItem = mock(CartItem.class);
 		when(cartItem.getId()).thenReturn(1L);
@@ -264,6 +270,40 @@ class OrderServiceTest {
 	}
 
 	@Test
+	@DisplayName("판매 중이 아닌 상품이면 예외가 발생한다")
+	void previewOrder_notOnSaleProduct_fail() {
+		// given
+		Long memberId = 1L;
+
+		Member member = mock(Member.class);
+		when(member.getId()).thenReturn(memberId);
+
+		Product product = mock(Product.class);
+		when(product.getStatus()).thenReturn(ProductStatus.SOLD_OUT);
+
+		CartItem cartItem = mock(CartItem.class);
+		when(cartItem.getProductId()).thenReturn(1L);
+
+		OrderPreviewRequest request = new OrderPreviewRequest(null);
+
+		when(memberCommand.getMember(memberId))
+			.thenReturn(member);
+
+		when(cartItemCommand.getCartItemsByMemberId(memberId))
+			.thenReturn(List.of(cartItem));
+
+		when(productCommand.getProductsForOrder(List.of(1L)))
+			.thenReturn(Map.of(
+				1L, product
+			));
+
+		// when & then
+		assertThatThrownBy(() -> orderService.previewOrder(memberId, request))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(ProductErrorCode.PRODUCT_NOT_ON_SALE.getMessage());
+	}
+
+	@Test
 	@DisplayName("상품 재고가 부족하면 예외가 발생한다")
 	void previewOrder_outOfStock_fail() {
 		// given
@@ -273,6 +313,7 @@ class OrderServiceTest {
 		when(member.getId()).thenReturn(memberId);
 
 		Product product = mock(Product.class);
+		when(product.getStatus()).thenReturn(ProductStatus.ON_SALE);
 		when(product.getStock()).thenReturn(1L);
 
 		CartItem cartItem = mock(CartItem.class);
