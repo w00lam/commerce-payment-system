@@ -8,9 +8,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
-import com.commercepaymentsystem.domain.cart.service.CartItemCommand;
+import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
-import com.commercepaymentsystem.domain.member.service.MemberCommand;
+import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewItemResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
@@ -18,7 +18,7 @@ import com.commercepaymentsystem.domain.order.mapper.OrderPreviewMapper;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
-import com.commercepaymentsystem.domain.product.service.ProductCommand;
+import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -27,9 +27,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OrderService {
 
-	private final MemberCommand memberCommand;
-	private final CartItemCommand cartItemCommand;
-	private final ProductCommand productCommand;
+	private final MemberService memberService;
+	private final CartService cartService;
+	private final ProductService productService;
 
 	/**
 	 * 주문서 미리보기 정보를 조회합니다.
@@ -47,7 +47,7 @@ public class OrderService {
 		Long memberId,
 		OrderPreviewRequest request
 	) {
-		Member member = memberCommand.getMember(memberId);
+		Member member = memberService.getMember(memberId);
 
 		List<CartItem> cartItems = findPreviewCartItems(
 			member.getId(),
@@ -107,14 +107,14 @@ public class OrderService {
 		List<Long> cartItemIds
 	) {
 		if (cartItemIds == null || cartItemIds.isEmpty()) {
-			return cartItemCommand.getCartItemsByMemberId(memberId);
+			return cartService.getCartItemsByMemberId(memberId);
 		}
 
 		List<Long> distinctCartItemIds = cartItemIds.stream()
 			.distinct()
 			.toList();
 
-		List<CartItem> cartItems = cartItemCommand.getCartItemsByMemberIdAndIds(
+		List<CartItem> cartItems = cartService.getCartItemsByMemberIdAndIds(
 			memberId,
 			distinctCartItemIds
 		);
@@ -135,7 +135,7 @@ public class OrderService {
 	private Map<Long, Product> findProductMap(List<CartItem> cartItems) {
 		List<Long> productIds = extractDistinctProductIds(cartItems);
 
-		return productCommand.getProductsForOrder(productIds);
+		return productService.getRequiredProductMap(productIds);
 	}
 
 	/**
