@@ -14,9 +14,9 @@ import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
 import com.commercepaymentsystem.domain.payment.exception.PaymentException;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
-import com.commercepaymentsystem.infrastructure.portone.PortOneClient;
+import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
-import com.commercepaymentsystem.infrastructure.portone.exception.PortOnePaymentVerificationException;
+import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneRetryableException;
 
 import lombok.RequiredArgsConstructor;
@@ -217,10 +217,10 @@ public class PaymentService {
 	private PortOnePaymentResponse loadPortOnePayment(String paymentId) {
 		try {
 			return portOneClient.getPayment(paymentId);
-		} catch (PortOnePaymentVerificationException exception) {
-			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, exception.getMessage());
 		} catch (PortOneRetryableException exception) {
 			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_REQUEST_FAILED, exception.getMessage());
+		} catch (PortOneException exception) {
+			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, exception.getMessage());
 		}
 	}
 
