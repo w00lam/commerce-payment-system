@@ -20,7 +20,7 @@ public class MemberController {
 
 	private final MemberService memberService;
 
-	@DeleteMapping("/me")
+	@DeleteMapping("/signout")
 	public ApiResponse<Void> deleteMyAccount(
 		@AuthenticationPrincipal Long memberId,
 		@Valid @RequestBody MemberDeleteRequest request

@@ -1,12 +1,41 @@
 package com.commercepaymentsystem.infrastructure.portone.exception;
 
-public abstract class PortOneException extends RuntimeException {
+public class PortOneException extends RuntimeException {
 
-	protected PortOneException(String message) {
-		super(message);
+	private final String errorType;
+	private final String pgCode;
+	private final String pgMessage;
+
+	public PortOneException(String message) {
+		this(message, null, null, null, null);
 	}
 
-	protected PortOneException(String message, Throwable cause) {
+	public PortOneException(String message, Throwable cause) {
+		this(message, null, null, null, cause);
+	}
+
+	public PortOneException(
+		String message,
+		String errorType,
+		String pgCode,
+		String pgMessage,
+		Throwable cause
+	) {
 		super(message, cause);
+		this.errorType = errorType;
+		this.pgCode = pgCode;
+		this.pgMessage = pgMessage;
+	}
+
+	public String getErrorType() {
+		return errorType;
+	}
+
+	public String getPgCode() {
+		return pgCode;
+	}
+
+	public String getPgMessage() {
+		return pgMessage;
 	}
 }

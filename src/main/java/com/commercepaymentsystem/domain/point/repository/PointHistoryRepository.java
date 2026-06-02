@@ -11,4 +11,6 @@ public interface PointHistoryRepository extends JpaRepository<PointHistory, Long
 	Page<PointHistory> findByMemberId(Long memberId, Pageable pageable);
 
 	boolean existsByPaymentIdAndType(Long paymentId, PointHistoryType type);
+
+	boolean existsByPaymentIdAndTypeAndRefundId(Long paymentId, PointHistoryType type, Long refundId);
 }
