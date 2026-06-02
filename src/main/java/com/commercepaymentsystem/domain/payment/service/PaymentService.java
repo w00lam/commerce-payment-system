@@ -15,7 +15,7 @@ import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
 import com.commercepaymentsystem.domain.payment.exception.PaymentException;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
 import com.commercepaymentsystem.infrastructure.portone.PortOneClient;
-import com.commercepaymentsystem.infrastructure.portone.PortOnePaymentResponse;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOnePaymentVerificationException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneRetryableException;
 

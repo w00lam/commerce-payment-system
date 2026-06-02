@@ -17,7 +17,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-import com.commercepaymentsystem.infrastructure.portone.exception.PortOneAuthenticationException;
+import com.commercepaymentsystem.infrastructure.portone.config.PortOneProperties;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelRequest;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelResponse;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmRequest;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmResponse;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOnePaymentVerificationException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneRetryableException;
 
@@ -44,60 +49,12 @@ class PortOneClientTest {
 	}
 
 	@Test
-	@DisplayName("API Secret으로 access token을 발급한다")
-	void issueAccessToken_success() {
-		// given
-		server.expect(once(), requestTo("https://api.portone.test/login/api-secret"))
-			.andExpect(method(POST))
-			.andExpect(header(HttpHeaders.CONTENT_TYPE, APPLICATION_JSON_VALUE))
-			.andExpect(content().json("""
-				{
-				  "apiSecret": "test-api-secret"
-				}
-				"""))
-			.andRespond(withSuccess("""
-				{
-				  "accessToken": "access-token",
-				  "refreshToken": "refresh-token"
-				}
-				""", APPLICATION_JSON));
-
-		// when
-		String accessToken = portOneClient.issueAccessToken();
-
-		// then
-		assertThat(accessToken).isEqualTo("access-token");
-		server.verify();
-	}
-
-	@Test
-	@DisplayName("토큰 발급 인증 실패 응답은 인증 예외로 변환한다")
-	void issueAccessToken_unauthorized_fail() {
-		// given
-		server.expect(once(), requestTo("https://api.portone.test/login/api-secret"))
-			.andRespond(withUnauthorizedRequest());
-
-		// when & then
-		assertThatThrownBy(() -> portOneClient.issueAccessToken())
-			.isInstanceOf(PortOneAuthenticationException.class)
-			.hasMessageContaining("PortOne 인증 실패");
-		server.verify();
-	}
-
-	@Test
-	@DisplayName("PortOne 외부 결제 단건 조회는 Bearer 토큰을 전송하고 결제 정보를 매핑한다")
+	@DisplayName("PortOne V2 payment lookup sends API Secret authorization and maps payment response")
 	void getPayment_success() {
 		// given
-		server.expect(once(), requestTo("https://api.portone.test/login/api-secret"))
-			.andRespond(withSuccess("""
-				{
-				  "accessToken": "access-token",
-				  "refreshToken": "refresh-token"
-				}
-				""", APPLICATION_JSON));
 		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123"))
 			.andExpect(method(GET))
-			.andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
 			.andRespond(withSuccess("""
 				{
 				  "id": "payment-123",
@@ -125,16 +82,88 @@ class PortOneClientTest {
 	}
 
 	@Test
-	@DisplayName("PortOne 외부 결제 단건 조회 404 응답은 결제 조회 실패 예외로 변환한다")
-	void getPayment_notFound_fail() {
+	@DisplayName("PortOne V2 payment confirm calls /payments/{paymentId}/confirm with API Secret authorization")
+	void confirmPayment_success() {
 		// given
-		server.expect(once(), requestTo("https://api.portone.test/login/api-secret"))
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/confirm"))
+			.andExpect(method(POST))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
+			.andExpect(content().json("""
+				{
+				  "storeId": "test-store-id",
+				  "paymentToken": "payment-token",
+				  "txId": "tx-123",
+				  "totalAmount": 10000
+				}
+				"""))
 			.andRespond(withSuccess("""
 				{
-				  "accessToken": "access-token",
-				  "refreshToken": "refresh-token"
+				  "transaction": {
+				    "pgTxId": "pg-tx-123",
+				    "paidAt": "2026-06-01T01:02:03Z"
+				  }
 				}
 				""", APPLICATION_JSON));
+
+		// when
+		PortOnePaymentConfirmResponse response = portOneClient.confirmPayment(
+			"payment-123",
+			new PortOnePaymentConfirmRequest("payment-token", "tx-123", 10_000L)
+		);
+
+		// then
+		assertThat(response.transaction().pgTxId()).isEqualTo("pg-tx-123");
+		assertThat(response.transaction().paidAt()).isEqualTo(Instant.parse("2026-06-01T01:02:03Z"));
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("PortOne V2 payment cancel calls /payments/{paymentId}/cancel with API Secret authorization")
+	void cancelPayment_success() {
+		// given
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
+			.andExpect(method(POST))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
+			.andExpect(content().json("""
+				{
+				  "storeId": "test-store-id",
+				  "amount": 5000,
+				  "taxFreeAmount": 0,
+				  "reason": "customer-request",
+				  "requester": "CUSTOMER"
+				}
+				"""))
+			.andRespond(withSuccess("""
+				{
+				  "cancellation": {
+				    "id": "cancel-123",
+				    "status": "SUCCEEDED",
+				    "pgCancellationId": "pg-cancel-123",
+				    "totalAmount": 5000,
+				    "reason": "customer-request",
+				    "requestedAt": "2026-06-01T01:02:03Z",
+				    "cancelledAt": "2026-06-01T01:03:03Z"
+				  }
+				}
+				""", APPLICATION_JSON));
+
+		// when
+		PortOnePaymentCancelResponse response = portOneClient.cancelPayment(
+			"payment-123",
+			new PortOnePaymentCancelRequest(5_000L, 0L, "customer-request", "CUSTOMER")
+		);
+
+		// then
+		assertThat(response.cancellation().id()).isEqualTo("cancel-123");
+		assertThat(response.cancellation().status()).isEqualTo("SUCCEEDED");
+		assertThat(response.cancellation().totalAmount()).isEqualTo(5_000L);
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("PortOne V2 payment lookup 404 response becomes payment verification exception")
+	void getPayment_notFound_fail() {
+		// given
 		server.expect(once(), requestTo("https://api.portone.test/payments/missing-payment"))
 			.andRespond(withResourceNotFound());
 
@@ -146,16 +175,9 @@ class PortOneClientTest {
 	}
 
 	@Test
-	@DisplayName("PortOne 외부 결제 단건 조회 5xx 응답은 재시도 가능 예외로 변환한다")
+	@DisplayName("PortOne V2 payment lookup 5xx response becomes retryable exception")
 	void getPayment_serverError_fail() {
 		// given
-		server.expect(once(), requestTo("https://api.portone.test/login/api-secret"))
-			.andRespond(withSuccess("""
-				{
-				  "accessToken": "access-token",
-				  "refreshToken": "refresh-token"
-				}
-				""", APPLICATION_JSON));
 		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123"))
 			.andRespond(withServerError());
 
