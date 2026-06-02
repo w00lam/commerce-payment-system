@@ -27,7 +27,7 @@ public class MemberCommand {
 	 * @return 조회된 회원
 	 */
 	public Member getMember(Long memberId) {
-		return memberRepository.findById(memberId)
+		return memberRepository.findByIdAndDeletedAtIsNull(memberId)
 			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 }

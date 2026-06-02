@@ -16,6 +16,7 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.mapper.OrderPreviewMapper;
 import com.commercepaymentsystem.domain.product.entity.Product;
+import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
 import com.commercepaymentsystem.domain.product.service.ProductCommand;
 import com.commercepaymentsystem.global.exception.BusinessException;
@@ -63,7 +64,7 @@ public class OrderService {
 
 		Map<Long, Product> productMap = findProductMap(cartItems);
 
-		validateEnoughStock(
+		validateOrderableProduct(
 			cartItems,
 			productMap
 		);
@@ -151,14 +152,15 @@ public class OrderService {
 	}
 
 	/**
-	 * 상품 재고가 장바구니 수량보다 충분한지 검증합니다.
+	 * 상품이 주문 가능한 상태인지 검증합니다.
 	 *
-	 * <p>이 메서드는 재고를 차감하지 않고, 부족 여부만 확인합니다.</p>
+	 * <p>판매 중인 상품인지 확인하고, 장바구니 수량보다 재고가 충분한지 검증합니다.
+	 * 이 메서드는 재고를 차감하지 않고, 주문 가능 여부만 확인합니다.</p>
 	 *
 	 * @param cartItems 장바구니 상품 목록
 	 * @param productMap 상품 ID를 key로 갖는 상품 Map
 	 */
-	private void validateEnoughStock(
+	private void validateOrderableProduct(
 		List<CartItem> cartItems,
 		Map<Long, Product> productMap
 	) {
@@ -168,9 +170,37 @@ public class OrderService {
 				cartItem.getProductId()
 			);
 
-			if (product.getStock() < cartItem.getQuantity()) {
-				throw new BusinessException(ProductErrorCode.OUT_OF_STOCK);
-			}
+			validateProductStatus(product);
+			validateEnoughStock(
+				product,
+				cartItem.getQuantity()
+			);
+		}
+	}
+
+	/**
+	 * 상품이 판매 중 상태인지 검증합니다.
+	 *
+	 * @param product 상품
+	 */
+	private void validateProductStatus(Product product) {
+		if (product.getStatus() != ProductStatus.ON_SALE) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+		}
+	}
+
+	/**
+	 * 상품 재고가 요청 수량보다 충분한지 검증합니다.
+	 *
+	 * @param product 상품
+	 * @param quantity 요청 수량
+	 */
+	private void validateEnoughStock(
+		Product product,
+		Long quantity
+	) {
+		if (product.getStock() < quantity) {
+			throw new BusinessException(ProductErrorCode.OUT_OF_STOCK);
 		}
 	}
 
