@@ -1,4 +1,4 @@
-package com.commercepaymentsystem.infrastructure.portone;
+package com.commercepaymentsystem.infrastructure.portone.client;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.http.HttpMethod.*;
@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import com.commercepaymentsystem.infrastructure.portone.config.PortOneProperties;
@@ -23,7 +24,7 @@ import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancel
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmRequest;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmResponse;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
-import com.commercepaymentsystem.infrastructure.portone.exception.PortOnePaymentVerificationException;
+import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneRetryableException;
 
 class PortOneClientTest {
@@ -129,6 +130,7 @@ class PortOneClientTest {
 				  "storeId": "test-store-id",
 				  "amount": 5000,
 				  "taxFreeAmount": 0,
+				  "currentCancellableAmount": 10000,
 				  "reason": "customer-request",
 				  "requester": "CUSTOMER"
 				}
@@ -140,6 +142,8 @@ class PortOneClientTest {
 				    "status": "SUCCEEDED",
 				    "pgCancellationId": "pg-cancel-123",
 				    "totalAmount": 5000,
+				    "pgCode": "00",
+				    "pgMessage": "cancel approved",
 				    "reason": "customer-request",
 				    "requestedAt": "2026-06-01T01:02:03Z",
 				    "cancelledAt": "2026-06-01T01:03:03Z"
@@ -150,18 +154,80 @@ class PortOneClientTest {
 		// when
 		PortOnePaymentCancelResponse response = portOneClient.cancelPayment(
 			"payment-123",
-			new PortOnePaymentCancelRequest(5_000L, 0L, "customer-request", "CUSTOMER")
+			new PortOnePaymentCancelRequest(5_000L, 0L, 10_000L, "customer-request", "CUSTOMER")
 		);
 
 		// then
 		assertThat(response.cancellation().id()).isEqualTo("cancel-123");
 		assertThat(response.cancellation().status()).isEqualTo("SUCCEEDED");
 		assertThat(response.cancellation().totalAmount()).isEqualTo(5_000L);
+		assertThat(response.cancellation().pgCode()).isEqualTo("00");
+		assertThat(response.cancellation().pgMessage()).isEqualTo("cancel approved");
 		server.verify();
 	}
 
 	@Test
-	@DisplayName("PortOne V2 payment lookup 404 response becomes payment verification exception")
+	@DisplayName("PortOne V2 payment cancel 401 response becomes non-retryable exception")
+	void cancelPayment_unauthorized_fail() {
+		// given
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
+			.andRespond(withUnauthorizedRequest());
+
+		// when & then
+		assertThatThrownBy(() -> portOneClient.cancelPayment(
+			"payment-123",
+			new PortOnePaymentCancelRequest(5_000L, 0L, 10_000L, "customer-request", "CUSTOMER")
+		))
+			.isInstanceOf(PortOneException.class)
+			.hasMessageContaining("PortOne 인증 실패");
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("PortOne V2 payment cancel PG rejection becomes non-retryable exception with PG fields")
+	void cancelPayment_pgRejection_fail() {
+		// given
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
+			.andRespond(withBadRequest().body("""
+				{
+				  "type": "PgProviderError",
+				  "message": "PG rejected cancel request",
+				  "pgCode": "DUPLICATED_CANCEL",
+				  "pgMessage": "already cancelled"
+				}
+				""").contentType(APPLICATION_JSON));
+
+		// when & then
+		assertThatThrownBy(() -> portOneClient.cancelPayment(
+			"payment-123",
+			new PortOnePaymentCancelRequest(5_000L, 0L, 10_000L, "customer-request", "CUSTOMER")
+		))
+			.isInstanceOf(PortOneException.class)
+			.hasMessageContaining("PortOne 결제 취소 실패")
+			.extracting("errorType", "pgCode", "pgMessage")
+			.containsExactly("PgProviderError", "DUPLICATED_CANCEL", "already cancelled");
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("PortOne V2 payment cancel network failure becomes retryable exception")
+	void cancelPayment_network_fail() {
+		// given
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
+			.andRespond(withException(new ResourceAccessException("timeout")));
+
+		// when & then
+		assertThatThrownBy(() -> portOneClient.cancelPayment(
+			"payment-123",
+			new PortOnePaymentCancelRequest(5_000L, 0L, 10_000L, "customer-request", "CUSTOMER")
+		))
+			.isInstanceOf(PortOneRetryableException.class)
+			.hasMessageContaining("PortOne 재시도 가능 오류");
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("PortOne V2 payment lookup 404 response becomes non-retryable exception")
 	void getPayment_notFound_fail() {
 		// given
 		server.expect(once(), requestTo("https://api.portone.test/payments/missing-payment"))
@@ -169,7 +235,7 @@ class PortOneClientTest {
 
 		// when & then
 		assertThatThrownBy(() -> portOneClient.getPayment("missing-payment"))
-			.isInstanceOf(PortOnePaymentVerificationException.class)
+			.isInstanceOf(PortOneException.class)
 			.hasMessageContaining("PortOne 결제 조회 실패");
 		server.verify();
 	}
