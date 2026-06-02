@@ -2,25 +2,22 @@ package com.commercepaymentsystem.domain.order.service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
-import com.commercepaymentsystem.domain.cart.repository.CartItemRepository;
+import com.commercepaymentsystem.domain.cart.service.CartItemCommand;
 import com.commercepaymentsystem.domain.member.entity.Member;
-import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
-import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.domain.member.service.MemberCommand;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewItemResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.mapper.OrderPreviewMapper;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
-import com.commercepaymentsystem.domain.product.repository.ProductRepository;
+import com.commercepaymentsystem.domain.product.service.ProductCommand;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -29,14 +26,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class OrderService {
 
-	private final MemberRepository memberRepository;
-	private final CartItemRepository cartItemRepository;
-	private final ProductRepository productRepository;
+	private final MemberCommand memberCommand;
+	private final CartItemCommand cartItemCommand;
+	private final ProductCommand productCommand;
 
 	/**
 	 * 주문서 미리보기 정보를 조회합니다.
 	 *
 	 * <p>장바구니 상품을 기준으로 주문 예정 상품 목록과 총 주문 금액을 계산합니다.
+	 * 장바구니가 비어 있는 경우에도 예외를 발생시키지 않고 빈 미리보기 응답을 반환합니다.
 	 * 이 메서드는 상품 재고를 차감하지 않고, 주문 가능 여부만 검증합니다.</p>
 	 *
 	 * @param memberId 회원 ID
@@ -48,14 +46,20 @@ public class OrderService {
 		Long memberId,
 		OrderPreviewRequest request
 	) {
-		Member member = findMember(memberId);
+		Member member = memberCommand.getMember(memberId);
 
 		List<CartItem> cartItems = findPreviewCartItems(
-			memberId,
+			member.getId(),
 			request.cartItemIds()
 		);
 
-		validateCartItems(cartItems);
+		if (cartItems.isEmpty()) {
+			return OrderPreviewMapper.toResponse(
+				member.getId(),
+				0L,
+				List.of()
+			);
+		}
 
 		Map<Long, Product> productMap = findProductMap(cartItems);
 
@@ -87,23 +91,13 @@ public class OrderService {
 	}
 
 	/**
-	 * 회원 ID로 회원을 조회합니다.
-	 *
-	 * @param memberId 회원 ID
-	 * @return 조회된 회원
-	 */
-	private Member findMember(Long memberId) {
-		return memberRepository.findById(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
-	}
-
-	/**
 	 * 주문서 미리보기에 사용할 장바구니 상품 목록을 조회합니다.
 	 *
 	 * <p>cartItemIds가 비어 있으면 회원의 전체 장바구니 상품을 조회하고,
-	 * 값이 있으면 해당 ID 목록에 포함된 장바구니 상품만 조회합니다.</p>
+	 * 값이 있으면 중복을 제거한 뒤 해당 ID 목록에 포함된 장바구니 상품만 조회합니다.
+	 * 선택 상품 미리보기 요청에서 존재하지 않는 장바구니 상품 ID가 포함되면 예외를 발생시킵니다.</p>
 	 *
-	 * @param memberId 회원 ID
+	 * @param memberId 검증된 회원 ID
 	 * @param cartItemIds 장바구니 상품 ID 목록
 	 * @return 주문서 미리보기에 사용할 장바구니 상품 목록
 	 */
@@ -112,15 +106,19 @@ public class OrderService {
 		List<Long> cartItemIds
 	) {
 		if (cartItemIds == null || cartItemIds.isEmpty()) {
-			return cartItemRepository.findAllByMemberId(memberId);
+			return cartItemCommand.getCartItemsByMemberId(memberId);
 		}
 
-		List<CartItem> cartItems = cartItemRepository.findAllByMemberIdAndIdIn(
+		List<Long> distinctCartItemIds = cartItemIds.stream()
+			.distinct()
+			.toList();
+
+		List<CartItem> cartItems = cartItemCommand.getCartItemsByMemberIdAndIds(
 			memberId,
-			cartItemIds
+			distinctCartItemIds
 		);
 
-		if (cartItems.size() != cartItemIds.size()) {
+		if (cartItems.size() != distinctCartItemIds.size()) {
 			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
 		}
 
@@ -128,39 +126,28 @@ public class OrderService {
 	}
 
 	/**
-	 * 장바구니 상품 목록이 비어 있는지 검증합니다.
-	 *
-	 * @param cartItems 장바구니 상품 목록
-	 */
-	private void validateCartItems(List<CartItem> cartItems) {
-		if (cartItems.isEmpty()) {
-			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
-		}
-	}
-
-	/**
-	 * 장바구니 상품에 연결된 상품 목록을 조회하고 Map으로 변환합니다.
+	 * 장바구니 상품에 연결된 상품 목록을 조회합니다.
 	 *
 	 * @param cartItems 장바구니 상품 목록
 	 * @return 상품 ID를 key로 갖는 상품 Map
 	 */
 	private Map<Long, Product> findProductMap(List<CartItem> cartItems) {
-		List<Long> productIds = cartItems.stream()
+		List<Long> productIds = extractDistinctProductIds(cartItems);
+
+		return productCommand.getProductsForOrder(productIds);
+	}
+
+	/**
+	 * 장바구니 상품 목록에서 중복 없는 상품 ID 목록을 추출합니다.
+	 *
+	 * @param cartItems 장바구니 상품 목록
+	 * @return 중복 제거된 상품 ID 목록
+	 */
+	private List<Long> extractDistinctProductIds(List<CartItem> cartItems) {
+		return cartItems.stream()
 			.map(CartItem::getProductId)
 			.distinct()
 			.toList();
-
-		List<Product> products = productRepository.findAllById(productIds);
-
-		if (products.size() != productIds.size()) {
-			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
-		}
-
-		return products.stream()
-			.collect(Collectors.toMap(
-				Product::getId,
-				Function.identity()
-			));
 	}
 
 	/**
