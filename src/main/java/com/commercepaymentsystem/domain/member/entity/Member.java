@@ -3,6 +3,9 @@ package com.commercepaymentsystem.domain.member.entity;
 import java.time.LocalDateTime;
 
 import com.commercepaymentsystem.global.entity.BaseEntity;
+import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
+import com.commercepaymentsystem.global.exception.BusinessException;
+import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -95,8 +98,18 @@ public class Member extends BaseEntity {
 
 	public void addPoint(Long amount) {
 		if (amount == null || amount <= 0) {
-			throw new IllegalArgumentException("적립할 포인트는 0보다 커야 합니다.");
+			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
 		}
 		this.pointBalance += amount;
+	}
+
+	public void deductPoint(Long amount) {
+		if (amount == null || amount <= 0) {
+			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
+		}
+		if (this.pointBalance < amount) {
+			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH);
+		}
+		this.pointBalance -= amount;
 	}
 }

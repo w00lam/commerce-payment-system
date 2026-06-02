@@ -26,7 +26,7 @@ public class PointService {
 	private final PointHistoryRepository pointHistoryRepository;
 
 	/**
-	 * 현재 잔액 조회: Member 엔티티에서 pointBalance 조회
+	 * 현재 잔액 조회
 	 */
 	public PointResponse getMyPoint(Long memberId) {
 		Member member = findMemberById(memberId);
@@ -34,7 +34,7 @@ public class PointService {
 	}
 
 	/**
-	 * 거래 내역 조회: Pageable을 이용한 페이징 처리
+	 * 거래 내역 조회
 	 */
 	public Page<PointHistoryResponse> getMyPointHistories(Long memberId, Pageable pageable) {
 		validateMemberExists(memberId);
@@ -47,42 +47,68 @@ public class PointService {
 	}
 
 	/**
-	 * 포인트 적립 (결제 완료 시 등)
-	 * 멱등성 보장을 위해 락 획득 후 중복 여부를 재검증함
+	 * 포인트 적립
 	 */
 	@Transactional
 	public void earnPoint(Long memberId, Long amount, Long paymentId) {
-		if (amount == null || amount <= 0) {
-			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
-		}
+		validatePointRequest(amount, paymentId);
 
-		if (paymentId == null) {
-			throw new PointException(PointErrorCode.PAYMENT_ID_REQUIRED);
-		}
+		Member member = findMemberByIdWithLock(memberId);
 
-		// 1. 비관적 락을 먼저 획득하여 동시성 제어 및 원자적 검증 환경 조성 (Lost Update 방지)
-		Member member = memberRepository.findByIdWithPessimisticLock(memberId)
-			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
-
-		// 2. 락 획득 상태에서 멱등성 재검증 (중복 적립 방지)
+		// 멱등성 보장: 이미 적립된 경우 리턴 (리뷰 반영)
 		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
-			throw new PointException(PointErrorCode.ALREADY_EARNED_POINT);
+			return;
 		}
 
 		member.addPoint(amount);
+		savePointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
+	}
 
-		PointHistory history = new PointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
+	/**
+	 * 포인트 차감
+	 */
+	@Transactional
+	public void deductPoint(Long memberId, Long amount, Long paymentId) {
+		validatePointRequest(amount, paymentId);
+
+		Member member = findMemberByIdWithLock(memberId);
+
+		// 멱등성 보장: 이미 차감된 경우 리턴
+		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)) {
+			return;
+		}
+
+		member.deductPoint(amount);
+		savePointHistory(memberId, paymentId, PointHistoryType.USE, amount);
+	}
+
+	private void validatePointRequest(Long amount, Long paymentId) {
+		if (amount == null || amount <= 0) {
+			throw new PointException(PointErrorCode.INVALID_POINT_AMOUNT);
+		}
+		if (paymentId == null) {
+			throw new PointException(PointErrorCode.PAYMENT_ID_REQUIRED);
+		}
+	}
+
+	private Member findMemberByIdWithLock(Long memberId) {
+		return memberRepository.findByIdWithPessimisticLock(memberId)
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+	}
+
+	private void savePointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
+		PointHistory history = new PointHistory(memberId, paymentId, type, amount);
 		pointHistoryRepository.save(history);
 	}
 
 	private Member findMemberById(Long memberId) {
 		return memberRepository.findById(memberId)
-			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 
 	private void validateMemberExists(Long memberId) {
 		if (!memberRepository.existsById(memberId)) {
-			throw new PointException(MemberErrorCode.MEMBER_NOT_FOUND);
+			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
 		}
 	}
 }
