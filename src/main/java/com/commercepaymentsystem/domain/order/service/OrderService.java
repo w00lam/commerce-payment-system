@@ -101,7 +101,7 @@ public class OrderService {
 	 * 주문서 미리보기에 사용할 장바구니 상품 목록을 조회합니다.
 	 *
 	 * <p>cartItemIds가 비어 있으면 회원의 전체 장바구니 상품을 조회하고,
-	 * 값이 있으면 해당 ID 목록에 포함된 장바구니 상품만 조회합니다.</p>
+	 * 값이 있으면 중복을 제거한 뒤 해당 ID 목록에 포함된 장바구니 상품만 조회합니다.</p>
 	 *
 	 * @param memberId 회원 ID
 	 * @param cartItemIds 장바구니 상품 ID 목록
@@ -115,12 +115,16 @@ public class OrderService {
 			return cartItemRepository.findAllByMemberId(memberId);
 		}
 
+		List<Long> distinctCartItemIds = cartItemIds.stream()
+			.distinct()
+			.toList();
+
 		List<CartItem> cartItems = cartItemRepository.findAllByMemberIdAndIdIn(
 			memberId,
-			cartItemIds
+			distinctCartItemIds
 		);
 
-		if (cartItems.size() != cartItemIds.size()) {
+		if (cartItems.size() != distinctCartItemIds.size()) {
 			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
 		}
 
