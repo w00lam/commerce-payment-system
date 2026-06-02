@@ -2,7 +2,9 @@ package com.commercepaymentsystem.domain.member.entity;
 
 import java.time.LocalDateTime;
 
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
+import com.commercepaymentsystem.global.exception.BusinessException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -98,5 +100,17 @@ public class Member extends BaseEntity {
 			throw new IllegalArgumentException("적립할 포인트는 0보다 커야 합니다.");
 		}
 		this.pointBalance += amount;
+	}
+
+	public void usePoint(Long amount) {
+		if (amount == null || amount <= 0) {
+			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT);
+		}
+
+		if (this.pointBalance < amount) {
+			throw new BusinessException(PointErrorCode.INSUFFICIENT_POINT);
+		}
+
+		this.pointBalance -= amount;
 	}
 }
