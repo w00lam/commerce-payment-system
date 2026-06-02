@@ -39,25 +39,57 @@ public class ProductCommand {
      */
     public Map<Long, Product> getProductsForCart(List<Long> productIds) {
         return productRepository.findAllById(productIds).stream()
-            .collect(Collectors.toMap(Product::getId, p -> p));
+            .collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
     /**
-     * 주문 또는 주문서 미리보기에 사용할 상품 목록을 Map 형태로 조회합니다.
+     * 주문서 미리보기에 사용할 상품 목록을 Map 형태로 조회합니다.
      *
-     * <p>주문 흐름에서는 장바구니 상품에 연결된 상품이 모두 존재해야 하므로,
-     * 요청한 상품 중 하나라도 존재하지 않으면 예외를 발생시킵니다.</p>
+     * <p>미리보기는 재고를 차감하지 않으므로 비관적 락을 사용하지 않습니다.</p>
      *
      * @param productIds 중복 제거가 완료된 상품 ID 목록
      * @return 상품 ID를 key로 갖는 상품 Map
      */
-    public Map<Long, Product> getProductsForOrder(List<Long> productIds) {
+    public Map<Long, Product> getProductsForOrderPreview(List<Long> productIds) {
         List<Product> products = productRepository.findAllById(productIds);
 
+        validateAllProductsExist(
+            products,
+            productIds
+        );
+
+        return toProductMap(products);
+    }
+
+    /**
+     * 주문 생성에 사용할 상품 목록을 Map 형태로 조회합니다.
+     *
+     * <p>주문 생성은 재고 차감이 발생하므로 비관적 쓰기 락을 사용합니다.</p>
+     *
+     * @param productIds 중복 제거가 완료된 상품 ID 목록
+     * @return 상품 ID를 key로 갖는 상품 Map
+     */
+    public Map<Long, Product> getProductsForOrderCreate(List<Long> productIds) {
+        List<Product> products = productRepository.findAllByIdInForUpdate(productIds);
+
+        validateAllProductsExist(
+            products,
+            productIds
+        );
+
+        return toProductMap(products);
+    }
+
+    private void validateAllProductsExist(
+        List<Product> products,
+        List<Long> productIds
+    ) {
         if (products.size() != productIds.size()) {
             throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
         }
+    }
 
+    private Map<Long, Product> toProductMap(List<Product> products) {
         return products.stream()
             .collect(Collectors.toMap(
                 Product::getId,

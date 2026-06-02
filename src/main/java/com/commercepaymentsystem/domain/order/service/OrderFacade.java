@@ -153,7 +153,7 @@ public class OrderFacade {
 			.distinct()
 			.toList();
 
-		return productCommand.getProductsForOrder(productIds);
+		return productCommand.getProductsForOrderCreate(productIds);
 	}
 
 	private void validateAllProductsExist(

@@ -140,7 +140,7 @@ public class OrderService {
 	private Map<Long, Product> findProductMap(List<CartItem> cartItems) {
 		List<Long> productIds = extractDistinctProductIds(cartItems);
 
-		return productCommand.getProductsForOrder(productIds);
+		return productCommand.getProductsForOrderPreview(productIds);
 	}
 
 	/**
