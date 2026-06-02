@@ -20,6 +20,11 @@ public class MemberService {
 	private final MemberRepository memberRepository;
 	private final PasswordEncoder passwordEncoder;
 
+	public Member getMember(Long memberId) {
+		return memberRepository.findByIdAndDeletedAtIsNull(memberId)
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+	}
+
 	/**
 	 * 인증된 회원의 탈퇴 요청을 처리합니다.
 	 *
@@ -35,8 +40,7 @@ public class MemberService {
 		Long memberId,
 		MemberDeleteRequest request
 	) {
-		Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
-			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+		Member member = getMember(memberId);
 
 		validatePassword(
 			request.password(),
