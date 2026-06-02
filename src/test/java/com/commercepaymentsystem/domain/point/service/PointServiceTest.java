@@ -27,6 +27,7 @@ import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
 import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
+import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
@@ -149,7 +150,7 @@ class PointServiceTest {
 	}
 
 	@Test
-	@DisplayName("보유 포인트가 부족하면 PointException이 발생한다.")
+	@DisplayName("보유 포인트가 부족하면 BusinessException이 발생한다.")
 	void deductPoint_InsufficientPoint() {
 		// given
 		Long memberId = 1L;
@@ -163,9 +164,9 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.deductPoint(memberId, amount, paymentId))
-			.isInstanceOf(PointException.class)
+			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
-			.isEqualTo(PointErrorCode.INSUFFICIENT_POINT);
+			.isEqualTo(MemberErrorCode.POINT_NOT_ENOUGH);
 	}
 
 	@Test
@@ -215,7 +216,7 @@ class PointServiceTest {
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 PointException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트를 조회하면 BusinessException이 발생한다.")
 	void getMyPoint_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -223,13 +224,13 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPoint(memberId))
-			.isInstanceOf(PointException.class)
+			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
 
 	@Test
-	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 PointException이 발생한다.")
+	@DisplayName("존재하지 않는 회원의 포인트 이력을 조회하면 BusinessException이 발생한다.")
 	void getMyPointHistories_MemberNotFound() {
 		// given
 		Long memberId = 1L;
@@ -238,7 +239,7 @@ class PointServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> pointService.getMyPointHistories(memberId, pageable))
-			.isInstanceOf(PointException.class)
+			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}

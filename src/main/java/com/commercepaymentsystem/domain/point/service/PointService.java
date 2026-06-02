@@ -10,6 +10,7 @@ import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
 import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
+import com.commercepaymentsystem.global.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -77,10 +78,6 @@ public class PointService {
 			return;
 		}
 
-		if (member.getPointBalance() < amount) {
-			throw new PointException(PointErrorCode.INSUFFICIENT_POINT);
-		}
-
 		member.deductPoint(amount);
 		savePointHistory(memberId, paymentId, PointHistoryType.USE, amount);
 	}
@@ -96,7 +93,7 @@ public class PointService {
 
 	private Member findMemberByIdWithLock(Long memberId) {
 		return memberRepository.findByIdWithPessimisticLock(memberId)
-			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 
 	private void savePointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
@@ -106,12 +103,12 @@ public class PointService {
 
 	private Member findMemberById(Long memberId) {
 		return memberRepository.findById(memberId)
-			.orElseThrow(() -> new PointException(MemberErrorCode.MEMBER_NOT_FOUND));
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
 	}
 
 	private void validateMemberExists(Long memberId) {
 		if (!memberRepository.existsById(memberId)) {
-			throw new PointException(MemberErrorCode.MEMBER_NOT_FOUND);
+			throw new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND);
 		}
 	}
 }
