@@ -97,19 +97,21 @@ public class Member extends BaseEntity {
 	}
 
 	public void addPoint(Long amount) {
-		if (amount == null || amount <= 0) {
-			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
-		}
+		validateAmount(amount);
 		this.pointBalance += amount;
 	}
 
 	public void deductPoint(Long amount) {
-		if (amount == null || amount <= 0) {
-			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
-		}
+		validateAmount(amount);
 		if (this.pointBalance < amount) {
 			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH);
 		}
 		this.pointBalance -= amount;
+	}
+
+	private void validateAmount(Long amount) {
+		if (amount == null || amount <= 0) {
+			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
+		}
 	}
 }

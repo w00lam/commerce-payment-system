@@ -190,6 +190,86 @@ class PointServiceTest {
 	}
 
 	@Test
+	@DisplayName("포인트를 성공적으로 복구하고 이력을 남긴다.")
+	void restorePoint_Success() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.USE_CANCEL, refundId)).willReturn(false);
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)).willReturn(true);
+
+		// when
+		pointService.restorePoint(memberId, amount, paymentId, refundId);
+
+		// then
+		assertThat(member.getPointBalance()).isEqualTo(500L);
+		verify(pointHistoryRepository).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("원본 차감 내역이 없는 결제 건을 복구하려고 하면 PointException이 발생한다.")
+	void restorePoint_NoUsageFound() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.USE_CANCEL, refundId)).willReturn(false);
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)).willReturn(false);
+
+		// when & then
+		assertThatThrownBy(() -> pointService.restorePoint(memberId, amount, paymentId, refundId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.SOURCE_HISTORY_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("이미 복구된 환불 건에 대해 다시 복구를 시도하면 추가 복구 없이 리턴한다.")
+	void restorePoint_AlreadyRestored() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = mock(Member.class);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.USE_CANCEL, refundId)).willReturn(true);
+
+		// when
+		pointService.restorePoint(memberId, amount, paymentId, refundId);
+
+		// then
+		verify(member, never()).addPoint(anyLong());
+		verify(pointHistoryRepository, never()).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("환불 식별자(refundId)가 없으면 PointException이 발생한다.")
+	void restorePoint_NullRefundId() {
+		// given
+		Long memberId = 1L;
+		Long amount = 500L;
+		Long paymentId = 100L;
+		Long refundId = null;
+
+		// when & then
+		assertThatThrownBy(() -> pointService.restorePoint(memberId, amount, paymentId, refundId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.REFUND_ID_REQUIRED);
+	}
+
+	@Test
 	@DisplayName("포인트 거래 내역을 최신순으로 페이징 조회한다.")
 	void getMyPointHistories_Success() {
 		// given
