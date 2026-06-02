@@ -107,9 +107,13 @@ public class CartService {
                     .filter(java.util.Objects::nonNull)
                     .toList();
                     
-                return CartResponse.of(cart.getId(), memberId, itemDtos);
+                long totalAmount = itemDtos.stream()
+                    .mapToLong(dto -> dto.price() * dto.quantity())
+                    .sum();
+                    
+                return CartResponse.of(cart.getId(), memberId, itemDtos, totalAmount);
             })
-            .orElseGet(() -> CartResponse.of(null, memberId, List.of()));
+            .orElseGet(() -> CartResponse.of(null, memberId, List.of(), 0L));
     }
 
     /**
@@ -165,7 +169,7 @@ public class CartService {
     public CartClearResponse clearCart(Long memberId) {
         return cartRepository.findByMemberId(memberId)
             .map(cart -> {
-                cartItemRepository.deleteAll(cartItemRepository.findAllByCartId(cart.getId()));
+                cartItemRepository.deleteAllInBatch(cartItemRepository.findAllByCartId(cart.getId()));
                 return CartClearResponse.of(cart.getId());
             })
             .orElseGet(() -> CartClearResponse.of(null));

@@ -203,7 +203,7 @@ class CartServiceTest {
 
         // then
         assertThat(response.cartId()).isEqualTo(cart.getId());
-        verify(cartItemRepository).deleteAll(anyList());
+        verify(cartItemRepository).deleteAllInBatch(anyList());
     }
 
     @Test
@@ -228,6 +228,7 @@ class CartServiceTest {
         assertThat(response.items().get(0).productId()).isEqualTo(100L);
         assertThat(response.items().get(0).productName()).isEqualTo("Test Product");
         assertThat(response.items().get(0).quantity()).isEqualTo(2L);
+        assertThat(response.totalAmount()).isEqualTo(2000L);
     }
 
     @Test
@@ -244,6 +245,7 @@ class CartServiceTest {
         // then
         assertThat(response.cartId()).isNull();
         assertThat(response.items()).isEmpty();
+        assertThat(response.totalAmount()).isEqualTo(0L);
         verify(cartRepository, never()).save(any(Cart.class));
     }
 }
