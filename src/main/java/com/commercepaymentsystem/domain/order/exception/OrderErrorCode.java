@@ -21,6 +21,12 @@ public enum OrderErrorCode implements ErrorCode {
 		HttpStatus.BAD_REQUEST,
 		"ORDER_002",
 		"유효하지 않은 주문 상태입니다."
+	),
+
+	EMPTY_ORDER_ITEM(
+		HttpStatus.BAD_REQUEST,
+		"ORDER_003",
+		"주문할 장바구니 상품이 없습니다."
 	);
 
 	private final HttpStatus status;
