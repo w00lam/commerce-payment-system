@@ -1,5 +1,10 @@
 package com.commercepaymentsystem.domain.product.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -87,6 +92,26 @@ public class ProductService {
 	public ProductDetailResponse getProductDetail(Long productId) {
 		Product product = findProductById(productId);
 		return ProductDetailResponse.from(product);
+	}
+
+	public Product getProduct(Long productId) {
+		return findProductById(productId);
+	}
+
+	public Map<Long, Product> getProductMap(List<Long> productIds) {
+		return productRepository.findAllById(productIds).stream()
+			.collect(Collectors.toMap(Product::getId, Function.identity()));
+	}
+
+	public Map<Long, Product> getRequiredProductMap(List<Long> productIds) {
+		List<Product> products = productRepository.findAllById(productIds);
+
+		if (products.size() != productIds.size()) {
+			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+		}
+
+		return products.stream()
+			.collect(Collectors.toMap(Product::getId, Function.identity()));
 	}
 
 	/**

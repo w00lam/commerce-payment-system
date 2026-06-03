@@ -21,7 +21,7 @@ import com.commercepaymentsystem.domain.cart.dto.CartItemDeleteResponse;
 import com.commercepaymentsystem.domain.cart.dto.CartItemQuantityUpdateRequest;
 import com.commercepaymentsystem.domain.cart.dto.CartItemUpdateResponse;
 import com.commercepaymentsystem.domain.cart.dto.CartResponse;
-import com.commercepaymentsystem.domain.cart.service.CartService;
+import com.commercepaymentsystem.domain.cart.facade.CartFacade;
 import com.commercepaymentsystem.global.response.ApiResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -36,7 +36,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CartController {
 
-    private final CartService cartService;
+    private final CartFacade cartFacade;
 
     /**
      * 1. 장바구니 상품 담기
@@ -47,7 +47,7 @@ public class CartController {
         @AuthenticationPrincipal Long memberId,
         @Valid @RequestBody CartItemAddRequest request
     ) {
-        return ApiResponse.ok(cartService.addCartItem(memberId, request));
+        return ApiResponse.ok(cartFacade.addCartItem(memberId, request));
     }
 
     /**
@@ -57,7 +57,7 @@ public class CartController {
     public ApiResponse<CartResponse> getMyCart(
         @AuthenticationPrincipal Long memberId
     ) {
-        return ApiResponse.ok(cartService.getMyCart(memberId));
+        return ApiResponse.ok(cartFacade.getMyCart(memberId));
     }
 
     /**
@@ -69,7 +69,7 @@ public class CartController {
         @PathVariable Long cartItemId,
         @Valid @RequestBody CartItemQuantityUpdateRequest request
     ) {
-        return ApiResponse.ok(cartService.updateCartItemQuantity(memberId, cartItemId, request));
+        return ApiResponse.ok(cartFacade.updateCartItemQuantity(memberId, cartItemId, request));
     }
 
     /**
@@ -80,7 +80,7 @@ public class CartController {
         @AuthenticationPrincipal Long memberId,
         @PathVariable Long cartItemId
     ) {
-        return ApiResponse.ok(cartService.deleteCartItem(memberId, cartItemId));
+        return ApiResponse.ok(cartFacade.deleteCartItem(memberId, cartItemId));
     }
 
     /**
@@ -90,6 +90,6 @@ public class CartController {
     public ApiResponse<CartClearResponse> clearCart(
         @AuthenticationPrincipal Long memberId
     ) {
-        return ApiResponse.ok(cartService.clearCart(memberId));
+        return ApiResponse.ok(cartFacade.clearCart(memberId));
     }
 }

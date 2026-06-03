@@ -18,28 +18,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
-import com.commercepaymentsystem.domain.cart.service.CartItemCommand;
+import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
-import com.commercepaymentsystem.domain.member.service.MemberCommand;
+import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
-import com.commercepaymentsystem.domain.product.service.ProductCommand;
+import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
 	@Mock
-	private MemberCommand memberCommand;
+	private MemberService memberService;
 
 	@Mock
-	private CartItemCommand cartItemCommand;
+	private CartService cartService;
 
 	@Mock
-	private ProductCommand productCommand;
+	private ProductService productService;
 
 	@InjectMocks
 	private OrderService orderService;
@@ -79,13 +79,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(null);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberId(memberId))
+		when(cartService.getCartItemsByMemberId(memberId))
 			.thenReturn(List.of(macbookCartItem, iphoneCartItem));
 
-		when(productCommand.getProductsForOrder(List.of(1L, 2L)))
+		when(productService.getRequiredProductMap(List.of(1L, 2L)))
 			.thenReturn(Map.of(
 				1L, macbook,
 				2L, iphone
@@ -146,13 +146,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(cartItemIds);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberIdAndIds(memberId, cartItemIds))
+		when(cartService.getCartItemsByMemberIdAndIds(memberId, cartItemIds))
 			.thenReturn(List.of(cartItem1, cartItem2));
 
-		when(productCommand.getProductsForOrder(List.of(1L, 2L)))
+		when(productService.getRequiredProductMap(List.of(1L, 2L)))
 			.thenReturn(Map.of(
 				1L, macbook,
 				2L, iphone
@@ -192,13 +192,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(requestedCartItemIds);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberIdAndIds(memberId, distinctCartItemIds))
+		when(cartService.getCartItemsByMemberIdAndIds(memberId, distinctCartItemIds))
 			.thenReturn(List.of(cartItem));
 
-		when(productCommand.getProductsForOrder(List.of(1L)))
+		when(productService.getRequiredProductMap(List.of(1L)))
 			.thenReturn(Map.of(
 				1L, macbook
 			));
@@ -211,7 +211,7 @@ class OrderServiceTest {
 		assertThat(response.totalAmount()).isEqualTo(3500000L);
 		assertThat(response.items()).hasSize(1);
 
-		verify(cartItemCommand).getCartItemsByMemberIdAndIds(
+		verify(cartService).getCartItemsByMemberIdAndIds(
 			memberId,
 			distinctCartItemIds
 		);
@@ -228,10 +228,10 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(null);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberId(memberId))
+		when(cartService.getCartItemsByMemberId(memberId))
 			.thenReturn(List.of());
 
 		// when
@@ -257,10 +257,10 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(cartItemIds);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberIdAndIds(memberId, cartItemIds))
+		when(cartService.getCartItemsByMemberIdAndIds(memberId, cartItemIds))
 			.thenReturn(List.of(cartItem));
 
 		// when & then
@@ -286,13 +286,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(null);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberId(memberId))
+		when(cartService.getCartItemsByMemberId(memberId))
 			.thenReturn(List.of(cartItem));
 
-		when(productCommand.getProductsForOrder(List.of(1L)))
+		when(productService.getRequiredProductMap(List.of(1L)))
 			.thenReturn(Map.of(
 				1L, product
 			));
@@ -322,13 +322,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(null);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberId(memberId))
+		when(cartService.getCartItemsByMemberId(memberId))
 			.thenReturn(List.of(cartItem));
 
-		when(productCommand.getProductsForOrder(List.of(1L)))
+		when(productService.getRequiredProductMap(List.of(1L)))
 			.thenReturn(Map.of(
 				1L, product
 			));
@@ -353,13 +353,13 @@ class OrderServiceTest {
 
 		OrderPreviewRequest request = new OrderPreviewRequest(null);
 
-		when(memberCommand.getMember(memberId))
+		when(memberService.getMember(memberId))
 			.thenReturn(member);
 
-		when(cartItemCommand.getCartItemsByMemberId(memberId))
+		when(cartService.getCartItemsByMemberId(memberId))
 			.thenReturn(List.of(cartItem));
 
-		when(productCommand.getProductsForOrder(List.of(999L)))
+		when(productService.getRequiredProductMap(List.of(999L)))
 			.thenThrow(new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND));
 
 		// when & then
