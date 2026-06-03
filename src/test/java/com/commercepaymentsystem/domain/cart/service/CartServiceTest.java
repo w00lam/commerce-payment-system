@@ -1,13 +1,12 @@
 package com.commercepaymentsystem.domain.cart.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -18,234 +17,146 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.commercepaymentsystem.domain.cart.dto.CartClearResponse;
-import com.commercepaymentsystem.domain.cart.dto.CartItemAddRequest;
-import com.commercepaymentsystem.domain.cart.dto.CartItemAddResponse;
-import com.commercepaymentsystem.domain.cart.dto.CartItemDeleteResponse;
-import com.commercepaymentsystem.domain.cart.dto.CartItemQuantityUpdateRequest;
-import com.commercepaymentsystem.domain.cart.dto.CartItemUpdateResponse;
-import com.commercepaymentsystem.domain.cart.dto.CartResponse;
 import com.commercepaymentsystem.domain.cart.entity.Cart;
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
-import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.repository.CartItemRepository;
 import com.commercepaymentsystem.domain.cart.repository.CartRepository;
-import com.commercepaymentsystem.domain.product.entity.Product;
-import com.commercepaymentsystem.domain.product.entity.ProductCategory;
-import com.commercepaymentsystem.domain.product.entity.ProductStatus;
-import com.commercepaymentsystem.domain.product.service.ProductCommand;
-import com.commercepaymentsystem.global.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
 class CartServiceTest {
 
-    @Mock
-    private CartRepository cartRepository;
+	@Mock
+	private CartRepository cartRepository;
 
-    @Mock
-    private CartItemRepository cartItemRepository;
+	@Mock
+	private CartItemRepository cartItemRepository;
 
-    @Mock
-    private ProductCommand productCommand;
+	@InjectMocks
+	private CartService cartService;
 
-    @InjectMocks
-    private CartService cartService;
+	private Cart createCart(Long id, Long memberId) {
+		Cart cart = Cart.create(memberId);
+		ReflectionTestUtils.setField(cart, "id", id);
+		return cart;
+	}
 
-    private Product createProduct(Long id, String name, Long price, Long stock) {
-        Product product = Product.create(name, price, stock, "desc", ProductStatus.ON_SALE, ProductCategory.ELECTRONICS);
-        ReflectionTestUtils.setField(product, "id", id);
-        return product;
-    }
+	private CartItem createCartItem(Long id, Cart cart, Long productId, Long quantity) {
+		CartItem cartItem = CartItem.create(cart, productId, quantity);
+		ReflectionTestUtils.setField(cartItem, "id", id);
+		return cartItem;
+	}
 
-    private Cart createCart(Long id, Long memberId) {
-        Cart cart = Cart.create(memberId);
-        ReflectionTestUtils.setField(cart, "id", id);
-        return cart;
-    }
+	@Test
+	@DisplayName("장바구니에 새 상품을 추가한다.")
+	void addCartItem_NewProduct() {
+		// given
+		Long memberId = 1L;
+		Long productId = 100L;
+		Long quantity = 2L;
 
-    private CartItem createCartItem(Long id, Cart cart, Long productId, Long quantity) {
-        CartItem cartItem = CartItem.create(cart, productId, quantity);
-        ReflectionTestUtils.setField(cartItem, "id", id);
-        return cartItem;
-    }
+		Cart cart = createCart(10L, memberId);
+		CartItem savedItem = createCartItem(1000L, cart, productId, quantity);
 
-    @Test
-    @DisplayName("장바구니에 새로운 상품을 추가한다.")
-    void addCartItem_NewProduct() {
-        // given
-        Long memberId = 1L;
-        Long productId = 100L;
-        Long quantity = 2L;
-        CartItemAddRequest request = new CartItemAddRequest(productId, quantity);
+		when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
+		when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.empty());
+		when(cartItemRepository.save(any(CartItem.class))).thenReturn(savedItem);
 
-        Product product = createProduct(productId, "Test Product", 1000L, 10L);
-        Cart cart = createCart(10L, memberId);
-        CartItem savedItem = createCartItem(1000L, cart, productId, quantity);
+		// when
+		CartItem cartItem = cartService.addCartItem(memberId, productId, quantity);
 
-        when(productCommand.getProductForCart(productId)).thenReturn(product);
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.empty());
-        when(cartItemRepository.save(any(CartItem.class))).thenReturn(savedItem);
+		// then
+		assertThat(cartItem.getId()).isEqualTo(savedItem.getId());
+		assertThat(cartItem.getProductId()).isEqualTo(productId);
+		assertThat(cartItem.getQuantity()).isEqualTo(quantity);
+	}
 
-        // when
-        CartItemAddResponse response = cartService.addCartItem(memberId, request);
+	@Test
+	@DisplayName("이미 담긴 상품을 다시 추가하면 수량을 합산한다.")
+	void addCartItem_ExistingProduct() {
+		// given
+		Long memberId = 1L;
+		Long productId = 100L;
+		Long existingQuantity = 2L;
+		Long addedQuantity = 3L;
 
-        // then
-        assertThat(response.cartId()).isEqualTo(cart.getId());
-        assertThat(response.productId()).isEqualTo(productId);
-        assertThat(response.quantity()).isEqualTo(quantity);
-    }
+		Cart cart = createCart(10L, memberId);
+		CartItem existingItem = createCartItem(1000L, cart, productId, existingQuantity);
 
-    @Test
-    @DisplayName("장바구니에 이미 담긴 상품을 추가하면 수량이 합산된다.")
-    void addCartItem_ExistingProduct() {
-        // given
-        Long memberId = 1L;
-        Long productId = 100L;
-        Long existingQuantity = 2L;
-        Long addedQuantity = 3L;
-        CartItemAddRequest request = new CartItemAddRequest(productId, addedQuantity);
+		when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
+		when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.of(existingItem));
 
-        Product product = createProduct(productId, "Test Product", 1000L, 10L);
-        Cart cart = createCart(10L, memberId);
-        CartItem existingItem = createCartItem(1000L, cart, productId, existingQuantity);
+		// when
+		CartItem cartItem = cartService.addCartItem(memberId, productId, addedQuantity);
 
-        when(productCommand.getProductForCart(productId)).thenReturn(product);
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.of(existingItem));
+		// then
+		assertThat(cartItem.getQuantity()).isEqualTo(existingQuantity + addedQuantity);
+	}
 
-        // when
-        CartItemAddResponse response = cartService.addCartItem(memberId, request);
+	@Test
+	@DisplayName("장바구니 상품 수량을 변경한다.")
+	void updateCartItemQuantity() {
+		// given
+		Cart cart = createCart(10L, 1L);
+		CartItem cartItem = createCartItem(1000L, cart, 100L, 2L);
 
-        // then
-        assertThat(response.quantity()).isEqualTo(existingQuantity + addedQuantity);
-    }
+		// when
+		CartItem updatedCartItem = cartService.updateCartItemQuantity(cartItem, 5L);
 
-    @Test
-    @DisplayName("장바구니 추가 시 수량이 재고를 초과하면 예외가 발생한다.")
-    void addCartItem_OutOfStock() {
-        // given
-        Long memberId = 1L;
-        Long productId = 100L;
-        Long quantity = 11L; // Stock is 10
-        CartItemAddRequest request = new CartItemAddRequest(productId, quantity);
+		// then
+		assertThat(updatedCartItem.getQuantity()).isEqualTo(5L);
+	}
 
-        Product product = createProduct(productId, "Test Product", 1000L, 10L);
-        Cart cart = createCart(10L, memberId);
+	@Test
+	@DisplayName("장바구니 상품을 삭제한다.")
+	void deleteCartItem() {
+		// given
+		Long memberId = 1L;
+		Long cartItemId = 1000L;
+		Cart cart = createCart(10L, memberId);
+		CartItem cartItem = createCartItem(cartItemId, cart, 100L, 2L);
 
-        when(productCommand.getProductForCart(productId)).thenReturn(product);
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)).thenReturn(Optional.empty());
+		when(cartItemRepository.findByIdAndMemberId(cartItemId, memberId)).thenReturn(Optional.of(cartItem));
 
-        // when & then
-        assertThatThrownBy(() -> cartService.addCartItem(memberId, request))
-            .isInstanceOf(BusinessException.class)
-            .hasMessageContaining(CartErrorCode.OUT_OF_STOCK.getMessage());
-    }
+		// when
+		Long deletedCartItemId = cartService.deleteCartItem(memberId, cartItemId);
 
-    @Test
-    @DisplayName("장바구니에 담긴 상품 수량을 변경한다.")
-    void updateCartItemQuantity() {
-        // given
-        Long memberId = 1L;
-        Long cartItemId = 1000L;
-        Long productId = 100L;
-        Long newQuantity = 5L;
-        CartItemQuantityUpdateRequest request = new CartItemQuantityUpdateRequest(newQuantity);
+		// then
+		assertThat(deletedCartItemId).isEqualTo(cartItemId);
+		verify(cartItemRepository).delete(cartItem);
+	}
 
-        Cart cart = createCart(10L, memberId);
-        CartItem cartItem = createCartItem(cartItemId, cart, productId, 2L);
-        Product product = createProduct(productId, "Test Product", 1000L, 10L);
+	@Test
+	@DisplayName("장바구니 전체를 비운다.")
+	void clearCart() {
+		// given
+		Long memberId = 1L;
+		Cart cart = createCart(10L, memberId);
+		CartItem cartItem1 = createCartItem(1000L, cart, 100L, 2L);
+		CartItem cartItem2 = createCartItem(1001L, cart, 101L, 3L);
 
-        when(cartItemRepository.findByIdAndMemberId(cartItemId, memberId)).thenReturn(Optional.of(cartItem));
-        when(productCommand.getProductForCart(productId)).thenReturn(product);
+		when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
+		when(cartItemRepository.findAllByCartId(cart.getId())).thenReturn(List.of(cartItem1, cartItem2));
 
-        // when
-        CartItemUpdateResponse response = cartService.updateCartItemQuantity(memberId, cartItemId, request);
+		// when
+		Long cartId = cartService.clearCart(memberId);
 
-        // then
-        assertThat(response.quantity()).isEqualTo(newQuantity);
-    }
+		// then
+		assertThat(cartId).isEqualTo(cart.getId());
+		verify(cartItemRepository).deleteAllInBatch(anyList());
+	}
 
-    @Test
-    @DisplayName("장바구니 상품 단건을 삭제한다.")
-    void deleteCartItem() {
-        // given
-        Long memberId = 1L;
-        Long cartItemId = 1000L;
-        Cart cart = createCart(10L, memberId);
-        CartItem cartItem = createCartItem(cartItemId, cart, 100L, 2L);
+	@Test
+	@DisplayName("장바구니가 없으면 비우기 결과로 null을 반환한다.")
+	void clearCart_EmptyCart() {
+		// given
+		Long memberId = 1L;
 
-        when(cartItemRepository.findByIdAndMemberId(cartItemId, memberId)).thenReturn(Optional.of(cartItem));
+		when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.empty());
 
-        // when
-        CartItemDeleteResponse response = cartService.deleteCartItem(memberId, cartItemId);
+		// when
+		Long cartId = cartService.clearCart(memberId);
 
-        // then
-        assertThat(response.cartItemId()).isEqualTo(cartItemId);
-        verify(cartItemRepository).delete(cartItem);
-    }
-
-    @Test
-    @DisplayName("장바구니 전체를 비운다.")
-    void clearCart() {
-        // given
-        Long memberId = 1L;
-        Cart cart = createCart(10L, memberId);
-        CartItem cartItem1 = createCartItem(1000L, cart, 100L, 2L);
-        CartItem cartItem2 = createCartItem(1001L, cart, 101L, 3L);
-
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCartId(cart.getId())).thenReturn(List.of(cartItem1, cartItem2));
-
-        // when
-        CartClearResponse response = cartService.clearCart(memberId);
-
-        // then
-        assertThat(response.cartId()).isEqualTo(cart.getId());
-        verify(cartItemRepository).deleteAllInBatch(anyList());
-    }
-
-    @Test
-    @DisplayName("기존 장바구니 목록을 정상적으로 조회한다.")
-    void getMyCart_ExistingCart() {
-        // given
-        Long memberId = 1L;
-        Cart cart = createCart(10L, memberId);
-        CartItem cartItem = createCartItem(1000L, cart, 100L, 2L);
-        Product product = createProduct(100L, "Test Product", 1000L, 10L);
-
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findAllByCartId(cart.getId())).thenReturn(List.of(cartItem));
-        when(productCommand.getProductsForCart(List.of(100L))).thenReturn(Map.of(100L, product));
-
-        // when
-        CartResponse response = cartService.getMyCart(memberId);
-
-        // then
-        assertThat(response.cartId()).isEqualTo(cart.getId());
-        assertThat(response.items()).hasSize(1);
-        assertThat(response.items().get(0).productId()).isEqualTo(100L);
-        assertThat(response.items().get(0).productName()).isEqualTo("Test Product");
-        assertThat(response.items().get(0).quantity()).isEqualTo(2L);
-        assertThat(response.totalAmount()).isEqualTo(2000L);
-    }
-
-    @Test
-    @DisplayName("장바구니 조회 시, 장바구니가 없으면 빈 결과를 반환한다.")
-    void getMyCart_NewCart() {
-        // given
-        Long memberId = 1L;
-
-        when(cartRepository.findByMemberId(memberId)).thenReturn(Optional.empty());
-
-        // when
-        CartResponse response = cartService.getMyCart(memberId);
-
-        // then
-        assertThat(response.cartId()).isNull();
-        assertThat(response.items()).isEmpty();
-        assertThat(response.totalAmount()).isEqualTo(0L);
-        verify(cartRepository, never()).save(any(Cart.class));
-    }
+		// then
+		assertThat(cartId).isNull();
+	}
 }
