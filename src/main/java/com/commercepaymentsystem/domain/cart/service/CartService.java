@@ -92,7 +92,7 @@ public class CartService {
 	}
 
 	public List<CartItem> findCartEntitiesByIds(Long memberId, List<Long> cartItemIds) {
-		return cartItemRepository.findByIdInAndMember_IdWithProduct(cartItemIds, memberId);
+		return cartItemRepository.findByIdInAndCartMemberIdWithCart(cartItemIds, memberId);
 	}
 
 	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {

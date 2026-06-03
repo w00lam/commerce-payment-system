@@ -40,14 +40,14 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     );
 
     @Query("""
-    SELECT ci 
-    FROM CartItem ci 
-    JOIN FETCH ci.cart c 
-    WHERE ci.id IN :ids 
-      AND c.memberId = :memberId
-    """)
-    List<CartItem> findByIdInAndMember_IdWithProduct(
-        @Param("ids") List<Long> ids,
+		select ci
+		from CartItem ci
+		join fetch ci.cart c
+		where ci.id in :cartItemIds
+		and c.memberId = :memberId
+		""")
+    List<CartItem> findByIdInAndCartMemberIdWithCart(
+        @Param("cartItemIds") List<Long> cartItemIds,
         @Param("memberId") Long memberId
     );
 
