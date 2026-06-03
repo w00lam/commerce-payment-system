@@ -51,20 +51,6 @@ public class CartService {
 		return cartItemRepository.findAllByCartId(cartId);
 	}
 
-	public List<CartItem> getCartItemsByMemberId(Long memberId) {
-		return cartItemRepository.findAllByMemberId(memberId);
-	}
-
-	public List<CartItem> getCartItemsByMemberIdAndIds(
-		Long memberId,
-		List<Long> cartItemIds
-	) {
-		return cartItemRepository.findAllByMemberIdAndIdIn(
-			memberId,
-			cartItemIds
-		);
-	}
-
 	public Long getCartItemQuantity(Long memberId, Long productId) {
 		return cartRepository.findByMemberId(memberId)
 			.flatMap(cart -> cartItemRepository.findByCartIdAndProductId(cart.getId(), productId))
@@ -99,5 +85,20 @@ public class CartService {
 				return cart.getId();
 			})
 			.orElse(null);
+	}
+
+	public List<CartItem> findCartEntities(Long memberId) {
+		return cartItemRepository.findAllByMemberId(memberId);
+	}
+
+	public List<CartItem> findCartEntitiesByIds(Long memberId, List<Long> cartItemIds) {
+		return cartItemRepository.findByIdInAndCartMemberIdWithCart(cartItemIds, memberId);
+	}
+
+	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {
+		int deleted = cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId);
+		if (deleted != orderedItemIds.size()) {
+			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+		}
 	}
 }

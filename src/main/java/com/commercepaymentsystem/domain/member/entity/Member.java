@@ -2,9 +2,10 @@ package com.commercepaymentsystem.domain.member.entity;
 
 import java.time.LocalDateTime;
 
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
-import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.global.exception.BusinessException;
+import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 
 import jakarta.persistence.Column;
