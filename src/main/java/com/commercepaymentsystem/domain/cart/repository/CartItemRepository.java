@@ -53,11 +53,11 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     @Modifying
     @Query("""
-    DELETE FROM CartItem ci 
-    WHERE ci.id IN :ids 
+    DELETE FROM CartItem ci
+    WHERE ci.id IN :ids
       AND ci.cart.id IN (
-          SELECT c.id 
-          FROM Cart c 
+          SELECT c.id
+          FROM Cart c
           WHERE c.memberId = :memberId
       )
     """)

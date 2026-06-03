@@ -2,6 +2,9 @@ package com.commercepaymentsystem.domain.order.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,16 +102,32 @@ public class OrderFacade {
 		// 1. 장바구니 조회 (선택된 아이템만)
 		List<CartItem> cartItems = getValidateCartItems(memberId, cartItemIds);
 
-		// 2~3. 재고 차감 + 스냅샷 OrderItem 생성
+		// 2. 주문 대상 상품 ID 추출 후 오름차순 락 조회
+		List<Long> productIds = cartItems.stream()
+			.map(CartItem::getProductId)
+			.distinct()
+			.sorted()
+			.toList();
+
+		List<Product> lockedProducts = productService.getProductsForUpdate(productIds);
+
+		Map<Long, Product> productMap = lockedProducts.stream()
+			.collect(Collectors.toMap(Product::getId, Function.identity()));
+
+		// 3. 재고 차감 + 스냅샷 OrderItem 생성
 		List<OrderItem> orderItems = new ArrayList<>();
 
 		for (CartItem cartItem : cartItems) {
-			Long productId = cartItem.getProductId();
-			Product product = productService.getProduct(productId);
+			Product product = productMap.get(cartItem.getProductId());
+
+			if (product == null) {
+				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+			}
 
 			if (product.getStatus() != ProductStatus.ON_SALE) {
 				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
 			}
+
 			product.removeStock(cartItem.getQuantity());
 
 			OrderItem orderItem = new OrderItem(
@@ -116,11 +135,10 @@ public class OrderFacade {
 				product.getPrice(),
 				cartItem.getQuantity()
 			);
+
 			orderItems.add(orderItem);
 		}
 		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
-
-		member.deductPoint(request.safeUsedPointAmount());
 
 		// 4. 주문 저장
 		Order order = orderService.createOrder(member, orderItems, totalPrice, request.safeUsedPointAmount());
@@ -132,11 +150,7 @@ public class OrderFacade {
 		// 6. 결제 정보 생성
 		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(paymentCreateCommand);
 
-		// 7. 주문한 장바구니 아이템만 삭제
-		List<Long> orderedItemIds = cartItems.stream().map(CartItem::getId).toList();
-		cartService.clearCartItems(orderedItemIds, memberId);
-
-		// 8. 응답
+		// 7. 응답
 		return new OrderCreateResponse(
 			paymentCreateResult.orderId(),
 			order.getOrderNumber(),

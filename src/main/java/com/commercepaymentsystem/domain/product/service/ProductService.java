@@ -1,5 +1,7 @@
 package com.commercepaymentsystem.domain.product.service;
 
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -103,15 +105,20 @@ public class ProductService {
 			.collect(Collectors.toMap(Product::getId, Function.identity()));
 	}
 
-	public Map<Long, Product> getRequiredProductMap(List<Long> productIds) {
-		List<Product> products = productRepository.findAllById(productIds);
+	@Transactional
+	public List<Product> getProductsForUpdate(Collection<Long> productIds) {
+		List<Long> sortedProductIds = productIds.stream()
+			.distinct()
+			.sorted(Comparator.naturalOrder())
+			.toList();
 
-		if (products.size() != productIds.size()) {
+		List<Product> products = productRepository.findAllByIdInForUpdate(sortedProductIds);
+
+		if (products.size() != sortedProductIds.size()) {
 			throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
 		}
 
-		return products.stream()
-			.collect(Collectors.toMap(Product::getId, Function.identity()));
+		return products;
 	}
 
 	/**

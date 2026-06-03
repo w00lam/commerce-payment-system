@@ -209,7 +209,7 @@ class OrderFacadeTest {
 	}
 
 	@Test
-	@DisplayName("주문 생성 시 선택한 장바구니 상품으로 주문과 결제를 생성하고 선택 상품만 삭제한다.")
+	@DisplayName("주문 생성 시 선택한 장바구니 상품으로 주문과 결제를 생성한다.")
 	void createOrder_SelectedCartItems_Success() {
 		// given
 		Long memberId = 1L;
@@ -247,13 +247,12 @@ class OrderFacadeTest {
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
 			.thenReturn(List.of(firstCartItem, secondCartItem));
-		when(productService.getProduct(firstProductId))
-			.thenReturn(firstProduct);
-		when(productService.getProduct(secondProductId))
-			.thenReturn(secondProduct);
+		when(productService.getProductsForUpdate(List.of(firstProductId, secondProductId)))
+			.thenReturn(List.of(firstProduct, secondProduct));
 		when(orderService.createOrder(eq(member), anyList(), eq(80000L), eq(usedPointAmount)))
 			.thenAnswer(invocation -> {
 				List<OrderItem> orderItems = invocation.getArgument(1);
+
 				return createSavedOrder(
 					member,
 					orderItems,
@@ -289,7 +288,7 @@ class OrderFacadeTest {
 
 		assertThat(firstProduct.getStock()).isEqualTo(8L);
 		assertThat(secondProduct.getStock()).isEqualTo(4L);
-		assertThat(member.getPointBalance()).isEqualTo(4000L);
+		assertThat(member.getPointBalance()).isEqualTo(5000L);
 
 		ArgumentCaptor<PaymentCreateCommand> commandCaptor =
 			ArgumentCaptor.forClass(PaymentCreateCommand.class);
@@ -304,7 +303,10 @@ class OrderFacadeTest {
 		assertThat(command.usedPointAmount()).isEqualTo(usedPointAmount);
 		assertThat(command.finalPaymentAmount()).isEqualTo(79000L);
 
-		verify(cartService).clearCartItems(List.of(1L, 2L), memberId);
+		verify(productService).getProductsForUpdate(List.of(firstProductId, secondProductId));
+		verify(productService, never()).getProduct(firstProductId);
+		verify(productService, never()).getProduct(secondProductId);
+		verify(cartService, never()).clearCartItems(anyList(), any());
 	}
 
 	@Test
@@ -326,6 +328,7 @@ class OrderFacadeTest {
 			.hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.getMessage());
 
 		verify(productService, never()).getProduct(any());
+		verify(productService, never()).getProductsForUpdate(anyList());
 		verify(orderService, never()).createOrder(any(), anyList(), any(), any());
 		verify(paymentService, never()).createPendingPayment(any());
 		verify(cartService, never()).clearCartItems(anyList(), any());
@@ -354,8 +357,8 @@ class OrderFacadeTest {
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
 			.thenReturn(List.of(cartItem));
-		when(productService.getProduct(productId))
-			.thenReturn(product);
+		when(productService.getProductsForUpdate(List.of(productId)))
+			.thenReturn(List.of(product));
 
 		// when & then
 		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
@@ -365,6 +368,8 @@ class OrderFacadeTest {
 		assertThat(product.getStock()).isEqualTo(10L);
 		assertThat(member.getPointBalance()).isEqualTo(5000L);
 
+		verify(productService).getProductsForUpdate(List.of(productId));
+		verify(productService, never()).getProduct(productId);
 		verify(orderService, never()).createOrder(any(), anyList(), any(), any());
 		verify(paymentService, never()).createPendingPayment(any());
 		verify(cartService, never()).clearCartItems(anyList(), any());
