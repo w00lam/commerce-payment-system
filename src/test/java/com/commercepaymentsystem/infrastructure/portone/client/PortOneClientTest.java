@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.ExpectedCount.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ResponseCreator;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
@@ -214,7 +216,7 @@ class PortOneClientTest {
 	void cancelPayment_network_fail() {
 		// given
 		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
-			.andRespond(withException(new ResourceAccessException("timeout")));
+			.andRespond(withException(new IOException("timeout")));
 
 		// when & then
 		assertThatThrownBy(() -> portOneClient.cancelPayment(

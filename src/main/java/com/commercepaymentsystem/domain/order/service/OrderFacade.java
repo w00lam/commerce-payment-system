@@ -157,11 +157,10 @@ public class OrderFacade {
 		Order order = orderService.createOrder(member, orderItems, totalPrice, usedPointAmount);
 
 		// 5. 결제 코맨드 생성
-		PaymentCreateCommand paymentCreateCommand = new PaymentCreateCommand(memberId, order.getId(), totalPrice,
-			order.getUsedPointAmount(), totalPrice - order.getUsedPointAmount());
+		PaymentCreateCommand command = PaymentCreateCommand.from(order);
 
 		// 6. 결제 정보 생성
-		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(paymentCreateCommand);
+		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(command);
 
 		// 7. 응답 반환
 		List<OrderItemCreateResponse> items = order.getOrderItems().stream()
