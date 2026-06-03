@@ -100,4 +100,19 @@ public class CartService {
 			})
 			.orElse(null);
 	}
+
+	public List<CartItem> findCartEntities(Long memberId) {
+		return cartItemRepository.findAllByMemberId(memberId);
+	}
+
+	public List<CartItem> findCartEntitiesByIds(Long memberId, List<Long> cartItemIds) {
+		return cartItemRepository.findByIdInAndMember_IdWithProduct(cartItemIds, memberId);
+	}
+
+	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {
+		int deleted = cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId);
+		if (deleted != orderedItemIds.size()) {
+			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+		}
+	}
 }
