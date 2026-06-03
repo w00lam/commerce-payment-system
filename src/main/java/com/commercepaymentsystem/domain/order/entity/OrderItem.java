@@ -1,23 +1,15 @@
 package com.commercepaymentsystem.domain.order.entity;
 
+import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.global.entity.BaseEntity;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Getter
 @Table(name = "order_items")
+@Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderItem extends BaseEntity {
 
@@ -29,49 +21,36 @@ public class OrderItem extends BaseEntity {
 	@JoinColumn(name = "order_id", nullable = false)
 	private Order order;
 
-	@Column(name = "product_id", nullable = false)
-	private Long productId;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "product_id", nullable = false)
+	private Product product;
 
-	@Column(name = "product_name", nullable = false, length = 100)
+	@Column(name = "product_name", nullable = false, length = 200)
 	private String productName;
 
-	@Column(name = "order_price", nullable = false, columnDefinition = "INT UNSIGNED")
+	@Column(name = "order_price", nullable = false, columnDefinition = "int UNSIGNED")
 	private Long orderPrice;
 
-	@Column(nullable = false, columnDefinition = "INT UNSIGNED")
+	@Column(nullable = false, columnDefinition = "int UNSIGNED")
 	private Long quantity;
 
-	private OrderItem(
-		Order order,
-		Long productId,
-		String productName,
-		Long orderPrice,
-		Long quantity
-	) {
-		this.order = order;
-		this.productId = productId;
-		this.productName = productName;
+	public OrderItem(Product product, Long orderPrice, Long quantity) {
+		this.product = product;
+		this.productName = product.getName();
 		this.orderPrice = orderPrice;
 		this.quantity = quantity;
 	}
 
-	public static OrderItem create(
-		Order order,
-		Long productId,
-		String productName,
-		Long orderPrice,
-		Long quantity
-	) {
-		return new OrderItem(
-			order,
-			productId,
-			productName,
-			orderPrice,
-			quantity
-		);
+	void setOrder(Order order) {
+		this.order = order;
 	}
 
-	public Long getTotalPrice() {
-		return this.orderPrice * this.quantity;
+	public Long getSubtotal() {
+		return orderPrice * quantity;
 	}
+
+	public Long getProductId() {
+		return this.product.getId();
+	}
+
 }
