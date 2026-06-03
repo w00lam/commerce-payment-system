@@ -2,7 +2,6 @@ package com.commercepaymentsystem.domain.order.dto;
 
 import java.util.List;
 
-import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.entity.OrderStatus;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 

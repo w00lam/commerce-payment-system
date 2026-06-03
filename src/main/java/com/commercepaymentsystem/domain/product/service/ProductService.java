@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.product.dto.ProductCreateRequest;
 import com.commercepaymentsystem.domain.product.dto.ProductCreateResponse;
 import com.commercepaymentsystem.domain.product.dto.ProductDeleteResponse;
@@ -21,6 +22,7 @@ import com.commercepaymentsystem.domain.product.dto.ProductSearchCondition;
 import com.commercepaymentsystem.domain.product.dto.ProductUpdateRequest;
 import com.commercepaymentsystem.domain.product.dto.ProductUpdateResponse;
 import com.commercepaymentsystem.domain.product.entity.Product;
+import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
 import com.commercepaymentsystem.domain.product.repository.ProductRepository;
 import com.commercepaymentsystem.domain.product.repository.ProductSpecification;
@@ -163,6 +165,29 @@ public class ProductService {
 		product.delete();
 		// JPA 환경에서는 @Transactional 종료 시 더티 체킹으로 자동 UPDATE 처리됨
 		return ProductDeleteResponse.of(productId);
+	}
+
+	@Transactional
+	public List<Product> deductProductStocks(List<CartItem> cartItems) {
+		List<Long> productIds = cartItems.stream()
+			.map(CartItem::getProductId)
+			.distinct()
+			.sorted()
+			.toList();
+		List<Product> lockedProducts = getProductsForUpdate(productIds);
+		Map<Long, Product> productMap = lockedProducts.stream()
+			.collect(Collectors.toMap(Product::getId, Function.identity()));
+		for (CartItem cartItem : cartItems) {
+			Product product = productMap.get(cartItem.getProductId());
+			if (product == null) {
+				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+			}
+			if (product.getStatus() != ProductStatus.ON_SALE) {
+				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
+			}
+			product.removeStock(cartItem.getQuantity());
+		}
+		return lockedProducts;
 	}
 
 	/**

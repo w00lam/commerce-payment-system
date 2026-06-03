@@ -102,7 +102,6 @@ public class OrderFacade {
 
 		// 0. 회원 조회
 		Member member = memberService.getMember(memberId);
-
 		long usedPointAmount = request.safeUsedPointAmount();
 		if(member.getPointBalance() < usedPointAmount) {
 			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다");
@@ -111,58 +110,22 @@ public class OrderFacade {
 		// 1. 장바구니 조회 (선택된 아이템만)
 		List<CartItem> cartItems = getValidateCartItems(memberId, cartItemIds);
 
-		// 2. 주문 대상 상품 ID 추출 후 오름차순 락 조회
-		List<Long> productIds = cartItems.stream()
-			.map(CartItem::getProductId)
-			.distinct()
-			.sorted()
-			.toList();
+		// 2. 상품 리스트 생성
+		List<Product> lockedProducts = productService.deductProductStocks(cartItems);
 
-		List<Product> lockedProducts = productService.getProductsForUpdate(productIds);
+		// 3. 주문 저장
+		Order order = orderService.createOrder(member, cartItems, lockedProducts, usedPointAmount);
 
-		Map<Long, Product> productMap = lockedProducts.stream()
-			.collect(Collectors.toMap(Product::getId, Function.identity()));
-
-		// 3. 재고 차감 + 스냅샷 OrderItem 생성
-		List<OrderItem> orderItems = new ArrayList<>();
-
-		for (CartItem cartItem : cartItems) {
-			Product product = productMap.get(cartItem.getProductId());
-
-			if (product == null) {
-				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
-			}
-
-			if (product.getStatus() != ProductStatus.ON_SALE) {
-				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
-			}
-
-			product.removeStock(cartItem.getQuantity());
-
-			OrderItem orderItem = new OrderItem(
-				product,
-				product.getPrice(),
-				cartItem.getQuantity()
-			);
-
-			orderItems.add(orderItem);
-		}
-		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
-
-		if(usedPointAmount > totalPrice) {
+		// 4. 재고 차감 + 스냅샷 OrderItem 생성
+		if(usedPointAmount > order.getTotalPrice()) {
 			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT, "주문 총액보다 사용 포인트가 더 많습니다");
 		}
 
-		// 4. 주문 저장
-		Order order = orderService.createOrder(member, orderItems, totalPrice, usedPointAmount);
-
-		// 5. 결제 코맨드 생성
+		// 5. 결제 정보 생성
 		PaymentCreateCommand command = PaymentCreateCommand.from(order);
-
-		// 6. 결제 정보 생성
 		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(command);
 
-		// 7. 응답 반환
+		// 6. 응답 반환
 		List<OrderItemCreateResponse> items = order.getOrderItems().stream()
 			.map(OrderItemCreateResponse::from)
 			.toList();
@@ -194,7 +157,7 @@ public class OrderFacade {
 			: cartService.findCartEntitiesByIds(memberId, distinctCartItemIds);
 
 		if (!distinctCartItemIds.isEmpty() && cartItems.size() != distinctCartItemIds.size()) {
-			throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEM);
+			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
 		}
 
 		return cartItems;
@@ -211,7 +174,7 @@ public class OrderFacade {
 			: cartService.findCartEntitiesByIds(memberId, distinctCartItemIds);
 
 		if (cartItems.isEmpty()) {
-			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+			throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEM);
 		}
 
 		if (!distinctCartItemIds.isEmpty() && cartItems.size() != distinctCartItemIds.size()) {
