@@ -111,16 +111,11 @@ public class OrderFacade {
 		// 3. 주문 저장
 		Order order = orderService.createOrder(member, cartItems, lockedProducts, usedPointAmount);
 
-		// 4. 재고 차감 + 스냅샷 OrderItem 생성
-		if(usedPointAmount > order.getTotalPrice()) {
-			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT, "주문 총액보다 사용 포인트가 더 많습니다");
-		}
-
-		// 5. 결제 정보 생성
+		// 4. 결제 정보 생성
 		PaymentCreateCommand command = PaymentCreateCommand.from(order);
 		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(command);
 
-		// 6. 응답 반환
+		// 5. 응답 반환
 		List<OrderItemCreateResponse> items = order.getOrderItems().stream()
 			.map(OrderItemCreateResponse::from)
 			.toList();

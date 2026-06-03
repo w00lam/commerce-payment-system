@@ -107,14 +107,14 @@ public class Order extends BaseEntity {
 
 		if (usedPointAmount < 0) {
 			throw new BusinessException(
-				PointErrorCode.INVALID_POINT_AMOUNT,
+				OrderErrorCode.INVALID_POINT_AMOUNT,
 				"사용 포인트는 0 이상이어야 합니다."
 			);
 		}
 
 		if (usedPointAmount > totalPrice) {
 			throw new BusinessException(
-				PointErrorCode.INVALID_POINT_AMOUNT,
+				OrderErrorCode.INVALID_POINT_AMOUNT,
 				"사용 포인트는 주문 금액을 초과할 수 없습니다."
 			);
 		}
