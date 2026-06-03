@@ -50,11 +50,11 @@ public class OrderController {
 
 	// 내 주문 목록 조회
 	@GetMapping
-	public ApiResponse<PageResponse<GetOrderResponse>> getProducts(
+	public ApiResponse<PageResponse<GetOrderResponse>> getOrders(
 		@AuthenticationPrincipal Long memberId,
 		@PageableDefault(size = 20, sort = "createdAt") Pageable pageable
 	) {
-		PageResponse<GetOrderResponse> response = orderService.getProducts(memberId, pageable);
+		PageResponse<GetOrderResponse> response = orderService.getOrders(memberId, pageable);
 		return ApiResponse.ok(response);
 	}
 

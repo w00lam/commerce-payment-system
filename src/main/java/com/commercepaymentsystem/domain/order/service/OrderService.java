@@ -48,7 +48,7 @@ public class OrderService {
 	}
 
 	// 내 주문 목록 조회
-	public PageResponse<GetOrderResponse> getProducts(Long memberId, Pageable pageable) {
+	public PageResponse<GetOrderResponse> getOrders(Long memberId, Pageable pageable) {
 		Page<Order> orders = orderRepository.findByMember_Id(memberId, pageable);
 
 		return PageResponse.from(orders.map(GetOrderResponse::from));
