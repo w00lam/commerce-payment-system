@@ -2,6 +2,7 @@ package com.commercepaymentsystem.domain.payment.service;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -307,5 +308,11 @@ public class PaymentService {
 		} else {
 			payment.markPartiallyRefunded();
 		}
+	}
+
+
+	@Transactional(readOnly = true)
+	public Optional<PaymentCreateResult> findPaymentByOrderId(Long orderId) {
+		return paymentRepository.findByOrderId(orderId).map(PaymentCreateResult::from);
 	}
 }

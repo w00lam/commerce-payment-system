@@ -11,6 +11,7 @@ import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.service.MemberService;
+import com.commercepaymentsystem.domain.order.dto.GetOrderDetailResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderItemCreateResponse;
@@ -97,7 +98,7 @@ public class OrderFacade {
 		// 0. 회원 조회
 		Member member = memberService.getMember(memberId);
 		long usedPointAmount = request.safeUsedPointAmount();
-		if(member.getPointBalance() < usedPointAmount) {
+		if (member.getPointBalance() < usedPointAmount) {
 			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다");
 		}
 
@@ -131,6 +132,15 @@ public class OrderFacade {
 			paymentCreateResult.status(),
 			items
 		);
+	}
+
+	public GetOrderDetailResponse getOrderDetail(Long memberId, Long orderId) {
+
+		Order order = orderService.getMyOrderDetail(orderId, memberId);
+		PaymentCreateResult payment = paymentService.findPaymentByOrderId(order.getId())
+			.orElse(null);
+
+		return GetOrderDetailResponse.of(order, payment);
 	}
 
 	private List<CartItem> getPreviewCartItems(
@@ -172,4 +182,6 @@ public class OrderFacade {
 
 		return cartItems;
 	}
+
+
 }
