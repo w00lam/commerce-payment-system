@@ -15,8 +15,10 @@ import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.order.dto.GetOrderResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
+import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.order.repository.OrderRepository;
 import com.commercepaymentsystem.domain.product.entity.Product;
+import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.global.response.PageResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -50,6 +52,12 @@ public class OrderService {
 		Page<Order> orders = orderRepository.findByMember_Id(memberId, pageable);
 
 		return PageResponse.from(orders.map(GetOrderResponse::from));
+	}
+
+	public Order getMyOrderDetail(Long orderId, Long memberId) {
+		return orderRepository.findByIdAndMemberIdWithOrderItems(orderId, memberId).orElseThrow(
+			() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND)
+		);
 	}
 
 	// 주문 상태 변경 (CONFIRMED)

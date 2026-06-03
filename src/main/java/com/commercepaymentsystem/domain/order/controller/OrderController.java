@@ -4,11 +4,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.commercepaymentsystem.domain.order.dto.GetOrderDetailResponse;
 import com.commercepaymentsystem.domain.order.dto.GetOrderResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
@@ -46,6 +48,7 @@ public class OrderController {
 		return ApiResponse.ok(orderFacade.previewOrder(memberId, request));
 	}
 
+	// 내 주문 목록 조회
 	@GetMapping
 	public ApiResponse<PageResponse<GetOrderResponse>> getProducts(
 		@AuthenticationPrincipal Long memberId,
@@ -53,5 +56,13 @@ public class OrderController {
 	) {
 		PageResponse<GetOrderResponse> response = orderService.getProducts(memberId, pageable);
 		return ApiResponse.ok(response);
+	}
+
+	// 내 주문 단건 상세 조회
+	@GetMapping("/{orderId}")
+	public ApiResponse<GetOrderDetailResponse> getMyOrderDetail(
+		@AuthenticationPrincipal Long memberId, @PathVariable Long orderId
+	) {
+		return ApiResponse.ok(orderFacade.getOrderDetail(memberId, orderId));
 	}
 }
