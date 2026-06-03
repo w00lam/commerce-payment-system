@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
-import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
