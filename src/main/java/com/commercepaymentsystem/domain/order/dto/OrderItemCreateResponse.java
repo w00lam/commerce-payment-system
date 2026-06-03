@@ -1,6 +1,6 @@
 package com.commercepaymentsystem.domain.order.dto;
 
-public record OrderCreateItemResponse(
+public record OrderItemCreateResponse(
 
 	Long orderItemId,
 	Long productId,
