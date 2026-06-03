@@ -38,6 +38,6 @@ public class OrderController {
 		@AuthenticationPrincipal Long memberId,
 		@Valid @RequestBody OrderPreviewRequest request
 	) {
-		return ApiResponse.ok(orderService.previewOrder(memberId, request));
+		return ApiResponse.ok(orderFacade.previewOrder(memberId, request));
 	}
 }
