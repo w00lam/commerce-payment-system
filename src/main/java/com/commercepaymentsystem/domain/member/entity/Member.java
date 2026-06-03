@@ -6,7 +6,6 @@ import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
-import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 
 import jakarta.persistence.Column;
@@ -123,7 +122,7 @@ public class Member extends BaseEntity {
 		}
 
 		if (this.pointBalance < amount) {
-			throw new BusinessException(PointErrorCode.INSUFFICIENT_POINT);
+			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT);
 		}
 
 		this.pointBalance -= amount;
