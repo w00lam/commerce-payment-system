@@ -1,11 +1,15 @@
 package com.commercepaymentsystem.domain.order.controller;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.commercepaymentsystem.domain.order.dto.GetOrderResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
@@ -13,6 +17,7 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.service.OrderFacade;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.global.response.ApiResponse;
+import com.commercepaymentsystem.global.response.PageResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,5 +44,14 @@ public class OrderController {
 		@Valid @RequestBody OrderPreviewRequest request
 	) {
 		return ApiResponse.ok(orderFacade.previewOrder(memberId, request));
+	}
+
+	@GetMapping
+	public ApiResponse<PageResponse<GetOrderResponse>> getProducts(
+		@AuthenticationPrincipal Long memberId,
+		@PageableDefault(size = 20, sort = "createdAt") Pageable pageable
+	) {
+		PageResponse<GetOrderResponse> response = orderService.getProducts(memberId, pageable);
+		return ApiResponse.ok(response);
 	}
 }
