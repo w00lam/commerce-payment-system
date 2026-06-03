@@ -20,9 +20,11 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
+import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
@@ -139,9 +141,23 @@ public class OrderFacade {
 			orderItems.add(orderItem);
 		}
 		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
+		long usedPointAmount = request.safeUsedPointAmount();
+
+		if (usedPointAmount < 0) {
+			throw new BusinessException(
+				PointErrorCode.INVALID_POINT_AMOUNT,
+				"사용 포인트는 0 이상이어야 합니다.");
+		}
+
+		if (usedPointAmount > member.getPointBalance()) {
+			throw new BusinessException(
+				PointErrorCode.INVALID_POINT_AMOUNT,
+				"포인트 잔액이 부족합니다."
+			);
+		}
 
 		// 4. 주문 저장
-		Order order = orderService.createOrder(member, orderItems, totalPrice, request.safeUsedPointAmount());
+		Order order = orderService.createOrder(member, orderItems, totalPrice, usedPointAmount);
 
 		// 5. 결제 코맨드 생성
 		PaymentCreateCommand paymentCreateCommand = new PaymentCreateCommand(memberId, order.getId(), totalPrice,
@@ -165,7 +181,6 @@ public class OrderFacade {
 		);
 	}
 
-
 	private List<CartItem> getPreviewCartItems(
 		Long memberId,
 		List<Long> cartItemIds
@@ -179,7 +194,7 @@ public class OrderFacade {
 			: cartService.findCartEntitiesByIds(memberId, distinctCartItemIds);
 
 		if (!distinctCartItemIds.isEmpty() && cartItems.size() != distinctCartItemIds.size()) {
-			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+			throw new BusinessException(OrderErrorCode.EMPTY_ORDER_ITEM);
 		}
 
 		return cartItems;
