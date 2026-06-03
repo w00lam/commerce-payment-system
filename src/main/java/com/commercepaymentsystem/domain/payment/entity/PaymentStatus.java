@@ -5,6 +5,7 @@ public enum PaymentStatus {
 	PENDING,
 	CONFIRMED,
 	FAILED,
+	PARTIAL_REFUNDED,
 	REFUNDED;
 
 	/**
@@ -12,6 +13,10 @@ public enum PaymentStatus {
 	 */
 	public boolean isConfirmed() {
 		return this == CONFIRMED;
+	}
+
+	public boolean isRefundable() {
+		return this == CONFIRMED || this == PARTIAL_REFUNDED;
 	}
 
 	/**
@@ -34,5 +39,21 @@ public enum PaymentStatus {
 		}
 
 		return CONFIRMED;
+	}
+
+	public PaymentStatus partialRefund() {
+		if (!isRefundable()) {
+			return this;
+		}
+
+		return PARTIAL_REFUNDED;
+	}
+
+	public PaymentStatus refund() {
+		if (!isRefundable()) {
+			return this;
+		}
+
+		return REFUNDED;
 	}
 }

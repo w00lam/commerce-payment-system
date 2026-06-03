@@ -191,6 +191,27 @@ public class ProductService {
 	}
 
 	/**
+	 * 환불 처리 등으로 인해 차감되었던 상품 재고를 일괄 복구합니다.
+	 * 동시성 제어 및 데드락 방지를 위해 상품 식별자(ID) 정렬 및 비관적 락(PESSIMISTIC_WRITE)을 순차적으로 획득하여 갱신 분실(Lost Update)을 원천 차단합니다.
+	 *
+	 * @param productQuantities 상품 식별자(ID)와 복구할 재고 수량의 매핑 정보
+	 */
+	@Transactional
+	public void restoreProductStocks(Map<Long, Long> productQuantities) {
+		List<Product> lockedProducts = getProductsForUpdate(productQuantities.keySet());
+		Map<Long, Product> productMap = lockedProducts.stream()
+			.collect(Collectors.toMap(Product::getId, Function.identity()));
+
+		for (Map.Entry<Long, Long> productQuantity : productQuantities.entrySet()) {
+			Product product = productMap.get(productQuantity.getKey());
+			if (product == null) {
+				throw new BusinessException(ProductErrorCode.PRODUCT_NOT_FOUND);
+			}
+			product.addStock(productQuantity.getValue());
+		}
+	}
+
+	/**
 	 * 내부 공통 메서드: ID로 상품 조회
 	 */
 	private Product findProductById(Long productId) {

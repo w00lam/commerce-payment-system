@@ -54,6 +54,10 @@ public class Payment extends BaseEntity {
 	private Long finalPaymentAmount;
 
 	@NonNull
+	@Column(name = "earned_point_amount", nullable = false)
+	private Long earnedPointAmount;
+
+	@NonNull
 	@Enumerated(EnumType.STRING)
 	@Column(
 		nullable = false,
@@ -80,8 +84,17 @@ public class Payment extends BaseEntity {
 			totalOrderAmount,
 			usedPointAmount,
 			finalPaymentAmount,
+			calculateEarnedPointAmount(finalPaymentAmount),
 			PaymentStatus.PENDING
 		);
+	}
+
+	private static Long calculateEarnedPointAmount(Long finalPaymentAmount) {
+		if (finalPaymentAmount == null || finalPaymentAmount <= 0) {
+			return 0L;
+		}
+
+		return finalPaymentAmount / 100;
 	}
 
 	/**
@@ -98,6 +111,10 @@ public class Payment extends BaseEntity {
 		return this.status.isConfirmable();
 	}
 
+	public boolean isRefundable() {
+		return this.status.isRefundable();
+	}
+
 	/**
 	 * 결제를 확정 상태로 변경하고 확정 시각을 저장합니다.
 	 *
@@ -106,5 +123,13 @@ public class Payment extends BaseEntity {
 	public void confirm(Instant paidAt) {
 		this.status = this.status.confirm();
 		this.paidAt = paidAt;
+	}
+
+	public void markPartiallyRefunded() {
+		this.status = this.status.partialRefund();
+	}
+
+	public void markRefunded() {
+		this.status = this.status.refund();
 	}
 }
