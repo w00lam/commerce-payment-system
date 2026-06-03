@@ -25,6 +25,7 @@ import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
+import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
@@ -33,12 +34,14 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.entity.OrderStatus;
+import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.order.service.OrderFacade;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
@@ -180,13 +183,21 @@ class OrderFacadeTest {
 		assertThat(response.totalAmount()).isEqualTo(80000L);
 		assertThat(response.items()).hasSize(2);
 
+		assertThat(response.items().get(0).productId()).isEqualTo(firstProductId);
 		assertThat(response.items().get(0).productName()).isEqualTo("키보드");
+		assertThat(response.items().get(0).price()).isEqualTo(30000L);
+		assertThat(response.items().get(0).quantity()).isEqualTo(2L);
 		assertThat(response.items().get(0).subtotal()).isEqualTo(60000L);
 
+		assertThat(response.items().get(1).productId()).isEqualTo(secondProductId);
 		assertThat(response.items().get(1).productName()).isEqualTo("마우스");
+		assertThat(response.items().get(1).price()).isEqualTo(20000L);
+		assertThat(response.items().get(1).quantity()).isEqualTo(1L);
 		assertThat(response.items().get(1).subtotal()).isEqualTo(20000L);
 
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
+		verify(productService).getProduct(firstProductId);
+		verify(productService).getProduct(secondProductId);
 	}
 
 	@Test
@@ -209,6 +220,38 @@ class OrderFacadeTest {
 
 		verify(cartService).findCartEntities(memberId);
 		verify(productService, never()).getProduct(any());
+	}
+
+	@Test
+	@DisplayName("주문서 미리보기 시 판매 중이 아닌 상품이 있으면 예외가 발생한다.")
+	void previewOrder_ProductNotOnSale_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long productId = 100L;
+
+		OrderPreviewRequest request = new OrderPreviewRequest(List.of(1L));
+		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
+
+		Product product = createProduct(
+			productId,
+			"키보드",
+			30000L,
+			10L,
+			ProductStatus.SOLD_OUT
+		);
+
+		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
+			.thenReturn(List.of(cartItem));
+		when(productService.getProduct(productId))
+			.thenReturn(product);
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.previewOrder(memberId, request))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(ProductErrorCode.PRODUCT_NOT_ON_SALE.getMessage());
+
+		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L));
+		verify(productService).getProduct(productId);
 	}
 
 	@Test
@@ -246,23 +289,38 @@ class OrderFacadeTest {
 			ProductStatus.ON_SALE
 		);
 
+		OrderItem firstOrderItem = new OrderItem(
+			firstProduct,
+			firstProduct.getPrice(),
+			firstCartItem.getQuantity()
+		);
+
+		OrderItem secondOrderItem = new OrderItem(
+			secondProduct,
+			secondProduct.getPrice(),
+			secondCartItem.getQuantity()
+		);
+
+		Order savedOrder = createSavedOrder(
+			member,
+			List.of(firstOrderItem, secondOrderItem),
+			80000L,
+			usedPointAmount
+		);
+
 		when(memberService.getMember(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
 			.thenReturn(List.of(firstCartItem, secondCartItem));
-		when(productService.getProductsForUpdate(List.of(firstProductId, secondProductId)))
+		when(productService.deductProductStocks(List.of(firstCartItem, secondCartItem)))
 			.thenReturn(List.of(firstProduct, secondProduct));
-		when(orderService.createOrder(eq(member), anyList(), eq(80000L), eq(usedPointAmount)))
-			.thenAnswer(invocation -> {
-				List<OrderItem> orderItems = invocation.getArgument(1);
-
-				return createSavedOrder(
-					member,
-					orderItems,
-					80000L,
-					usedPointAmount
-				);
-			});
+		when(orderService.createOrder(
+			eq(member),
+			eq(List.of(firstCartItem, secondCartItem)),
+			eq(List.of(firstProduct, secondProduct)),
+			eq(usedPointAmount)
+		))
+			.thenReturn(savedOrder);
 		when(paymentService.createPendingPayment(any(PaymentCreateCommand.class)))
 			.thenReturn(new PaymentCreateResult(
 				"PAY-20260603-000001",
@@ -289,8 +347,18 @@ class OrderFacadeTest {
 		assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.PENDING);
 		assertThat(response.items()).hasSize(2);
 
-		assertThat(firstProduct.getStock()).isEqualTo(8L);
-		assertThat(secondProduct.getStock()).isEqualTo(4L);
+		assertThat(response.items().get(0).productId()).isEqualTo(firstProductId);
+		assertThat(response.items().get(0).productName()).isEqualTo("키보드");
+		assertThat(response.items().get(0).orderPrice()).isEqualTo(30000L);
+		assertThat(response.items().get(0).quantity()).isEqualTo(2L);
+		assertThat(response.items().get(0).totalPrice()).isEqualTo(60000L);
+
+		assertThat(response.items().get(1).productId()).isEqualTo(secondProductId);
+		assertThat(response.items().get(1).productName()).isEqualTo("마우스");
+		assertThat(response.items().get(1).orderPrice()).isEqualTo(20000L);
+		assertThat(response.items().get(1).quantity()).isEqualTo(1L);
+		assertThat(response.items().get(1).totalPrice()).isEqualTo(20000L);
+
 		assertThat(member.getPointBalance()).isEqualTo(5000L);
 
 		ArgumentCaptor<PaymentCreateCommand> commandCaptor =
@@ -306,7 +374,16 @@ class OrderFacadeTest {
 		assertThat(command.usedPointAmount()).isEqualTo(usedPointAmount);
 		assertThat(command.finalPaymentAmount()).isEqualTo(79000L);
 
-		verify(productService).getProductsForUpdate(List.of(firstProductId, secondProductId));
+		verify(memberService).getMember(memberId);
+		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
+		verify(productService).deductProductStocks(List.of(firstCartItem, secondCartItem));
+		verify(orderService).createOrder(
+			eq(member),
+			eq(List.of(firstCartItem, secondCartItem)),
+			eq(List.of(firstProduct, secondProduct)),
+			eq(usedPointAmount)
+		);
+
 		verify(productService, never()).getProduct(firstProductId);
 		verify(productService, never()).getProduct(secondProductId);
 		verify(cartService, never()).clearCartItems(anyList(), any());
@@ -328,17 +405,46 @@ class OrderFacadeTest {
 		// when & then
 		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
 			.isInstanceOf(BusinessException.class)
-			.hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.getMessage());
+			.hasMessage(OrderErrorCode.EMPTY_ORDER_ITEM.getMessage());
 
-		verify(productService, never()).getProduct(any());
-		verify(productService, never()).getProductsForUpdate(anyList());
-		verify(orderService, never()).createOrder(any(), anyList(), any(), any());
+		verify(memberService).getMember(memberId);
+		verify(cartService).findCartEntities(memberId);
+		verify(productService, never()).deductProductStocks(anyList());
+		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
 		verify(paymentService, never()).createPendingPayment(any());
 		verify(cartService, never()).clearCartItems(anyList(), any());
 	}
 
 	@Test
-	@DisplayName("주문 생성 시 판매 중이 아닌 상품이 있으면 재고 차감과 주문 생성을 하지 않는다.")
+	@DisplayName("주문 생성 시 선택한 장바구니 상품 일부를 찾지 못하면 예외가 발생한다.")
+	void createOrder_SelectedCartItemNotFound_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long productId = 100L;
+
+		OrderCreateRequest request = new OrderCreateRequest(List.of(1L, 2L), 1000L);
+		Member member = createMember(memberId, 5000L);
+		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
+
+		when(memberService.getMember(memberId))
+			.thenReturn(member);
+		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
+			.thenReturn(List.of(cartItem));
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.getMessage());
+
+		verify(memberService).getMember(memberId);
+		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
+		verify(productService, never()).deductProductStocks(anyList());
+		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
+		verify(paymentService, never()).createPendingPayment(any());
+	}
+
+	@Test
+	@DisplayName("주문 생성 시 판매 중이 아닌 상품이 있으면 주문과 결제를 생성하지 않는다.")
 	void createOrder_ProductNotOnSale_ThrowsException() {
 		// given
 		Long memberId = 1L;
@@ -348,32 +454,111 @@ class OrderFacadeTest {
 		Member member = createMember(memberId, 5000L);
 		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
 
-		Product product = createProduct(
-			productId,
-			"키보드",
-			30000L,
-			10L,
-			ProductStatus.SOLD_OUT
-		);
-
 		when(memberService.getMember(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
 			.thenReturn(List.of(cartItem));
-		when(productService.getProductsForUpdate(List.of(productId)))
-			.thenReturn(List.of(product));
+		when(productService.deductProductStocks(List.of(cartItem)))
+			.thenThrow(new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE));
 
 		// when & then
 		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
 			.isInstanceOf(BusinessException.class)
 			.hasMessage(ProductErrorCode.PRODUCT_NOT_ON_SALE.getMessage());
 
-		assertThat(product.getStock()).isEqualTo(10L);
 		assertThat(member.getPointBalance()).isEqualTo(5000L);
 
-		verify(productService).getProductsForUpdate(List.of(productId));
-		verify(productService, never()).getProduct(productId);
-		verify(orderService, never()).createOrder(any(), anyList(), any(), any());
+		verify(memberService).getMember(memberId);
+		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L));
+		verify(productService).deductProductStocks(List.of(cartItem));
+		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
+		verify(paymentService, never()).createPendingPayment(any());
+		verify(cartService, never()).clearCartItems(anyList(), any());
+	}
+
+	@Test
+	@DisplayName("주문 생성 시 사용 포인트가 회원 보유 포인트보다 크면 예외가 발생한다.")
+	void createOrder_UsedPointExceedsMemberPointBalance_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long usedPointAmount = 6000L;
+
+		OrderCreateRequest request = new OrderCreateRequest(
+			List.of(1L),
+			usedPointAmount
+		);
+
+		Member member = createMember(memberId, 5000L);
+
+		when(memberService.getMember(memberId))
+			.thenReturn(member);
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("포인트 잔액이 부족합니다");
+
+		verify(memberService).getMember(memberId);
+		verify(cartService, never()).findCartEntities(any());
+		verify(cartService, never()).findCartEntitiesByIds(any(), anyList());
+		verify(productService, never()).deductProductStocks(anyList());
+		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
+		verify(paymentService, never()).createPendingPayment(any());
+		verify(cartService, never()).clearCartItems(anyList(), any());
+	}
+
+	@Test
+	@DisplayName("주문 생성 시 사용 포인트가 주문 총액보다 크면 예외가 발생한다.")
+	void createOrder_UsedPointExceedsTotalPrice_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long productId = 100L;
+		Long usedPointAmount = 40000L;
+
+		OrderCreateRequest request = new OrderCreateRequest(
+			List.of(1L),
+			usedPointAmount
+		);
+
+		Member member = createMember(memberId, 50000L);
+		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
+
+		Product product = createProduct(
+			productId,
+			"키보드",
+			30000L,
+			10L,
+			ProductStatus.ON_SALE
+		);
+
+		when(memberService.getMember(memberId))
+			.thenReturn(member);
+		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
+			.thenReturn(List.of(cartItem));
+		when(productService.deductProductStocks(List.of(cartItem)))
+			.thenReturn(List.of(product));
+		when(orderService.createOrder(
+			eq(member),
+			eq(List.of(cartItem)),
+			eq(List.of(product)),
+			eq(usedPointAmount)
+		))
+			.thenThrow(new BusinessException(OrderErrorCode.INVALID_POINT_AMOUNT));
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(OrderErrorCode.INVALID_POINT_AMOUNT.getMessage());
+
+		verify(memberService).getMember(memberId);
+		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L));
+		verify(productService).deductProductStocks(List.of(cartItem));
+		verify(orderService).createOrder(
+			eq(member),
+			eq(List.of(cartItem)),
+			eq(List.of(product)),
+			eq(usedPointAmount)
+		);
 		verify(paymentService, never()).createPendingPayment(any());
 		verify(cartService, never()).clearCartItems(anyList(), any());
 	}
