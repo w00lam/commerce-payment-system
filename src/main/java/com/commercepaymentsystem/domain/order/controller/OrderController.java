@@ -5,6 +5,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.commercepaymentsystem.domain.order.dto.GetOrderDetailResponse;
 import com.commercepaymentsystem.domain.order.dto.GetOrderResponse;
+import com.commercepaymentsystem.domain.order.dto.OrderCancelResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
@@ -66,5 +68,13 @@ public class OrderController {
 		@AuthenticationPrincipal Long memberId, @PathVariable Long orderId
 	) {
 		return ApiResponse.ok(orderFacade.getOrderDetail(memberId, orderId));
+	}
+
+	@PatchMapping("/{orderId}/cancel")
+	public ApiResponse<OrderCancelResponse> cancelOrder(
+		@AuthenticationPrincipal Long memberId,
+		@PathVariable Long orderId
+	) {
+		return ApiResponse.ok(orderFacade.cancelOrder(memberId, orderId));
 	}
 }
