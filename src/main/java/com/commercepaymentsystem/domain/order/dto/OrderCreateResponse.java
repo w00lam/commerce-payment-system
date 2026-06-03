@@ -17,6 +17,6 @@ public record OrderCreateResponse(
 	OrderStatus orderStatus,
 	String paymentId,
 	PaymentStatus paymentStatus,
-	List<OrderItem> items
+	List<OrderItemCreateResponse> items
 ) {
 }

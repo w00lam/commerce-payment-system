@@ -17,6 +17,7 @@ import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
+import com.commercepaymentsystem.domain.order.dto.OrderItemCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
@@ -162,18 +163,22 @@ public class OrderFacade {
 		// 6. 결제 정보 생성
 		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(paymentCreateCommand);
 
-		// 7. 응답
+		// 7. 응답 반환
+		List<OrderItemCreateResponse> items = order.getOrderItems().stream()
+			.map(OrderItemCreateResponse::from)
+			.toList();
+
 		return new OrderCreateResponse(
-			paymentCreateResult.orderId(),
+			order.getId(),
 			order.getOrderNumber(),
-			paymentCreateResult.memberId(),
-			paymentCreateResult.totalOrderAmount(),
-			paymentCreateResult.usedPointAmount(),
+			order.getMemberId(),
+			order.getTotalPrice(),
+			order.getUsedPointAmount(),
 			paymentCreateResult.finalPaymentAmount(),
 			order.getStatus(),
 			paymentCreateResult.paymentId(),
 			paymentCreateResult.status(),
-			orderItems
+			items
 		);
 	}
 
