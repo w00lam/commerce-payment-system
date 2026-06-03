@@ -8,6 +8,10 @@ public enum PaymentStatus {
 	PARTIAL_REFUNDED,
 	REFUNDED;
 
+	public boolean isPending() {
+		return this == PENDING;
+	}
+
 	/**
 	 * 현재 상태가 이미 확정 완료 상태인지 확인합니다.
 	 */
@@ -39,6 +43,14 @@ public enum PaymentStatus {
 		}
 
 		return CONFIRMED;
+	}
+
+	public PaymentStatus fail() {
+		if (!isPending()) {
+			return this;
+		}
+
+		return FAILED;
 	}
 
 	public PaymentStatus partialRefund() {
