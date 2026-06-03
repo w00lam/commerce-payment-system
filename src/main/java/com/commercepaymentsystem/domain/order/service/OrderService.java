@@ -19,6 +19,7 @@ import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.order.repository.OrderRepository;
 import com.commercepaymentsystem.domain.product.entity.Product;
+import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.global.response.PageResponse;
 
@@ -30,6 +31,7 @@ public class OrderService {
 
 	private final OrderRepository orderRepository;
 	private final OrderNumberGenerator orderNumberGenerator;
+	private final ProductService productService;
 
 
 
