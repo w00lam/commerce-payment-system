@@ -115,16 +115,4 @@ public class Member extends BaseEntity {
 			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
 		}
 	}
-
-	public void usePoint(Long amount) {
-		if (amount == null || amount <= 0) {
-			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT);
-		}
-
-		if (this.pointBalance < amount) {
-			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT);
-		}
-
-		this.pointBalance -= amount;
-	}
 }
