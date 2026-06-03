@@ -13,6 +13,7 @@ import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
+import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
@@ -101,6 +102,11 @@ public class OrderFacade {
 		// 0. 회원 조회
 		Member member = memberService.getMember(memberId);
 
+		long usedPointAmount = request.safeUsedPointAmount();
+		if(member.getPointBalance() < usedPointAmount) {
+			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다");
+		}
+
 		// 1. 장바구니 조회 (선택된 아이템만)
 		List<CartItem> cartItems = getValidateCartItems(memberId, cartItemIds);
 
@@ -141,19 +147,9 @@ public class OrderFacade {
 			orderItems.add(orderItem);
 		}
 		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
-		long usedPointAmount = request.safeUsedPointAmount();
 
-		if (usedPointAmount < 0) {
-			throw new BusinessException(
-				PointErrorCode.INVALID_POINT_AMOUNT,
-				"사용 포인트는 0 이상이어야 합니다.");
-		}
-
-		if (usedPointAmount > member.getPointBalance()) {
-			throw new BusinessException(
-				PointErrorCode.INVALID_POINT_AMOUNT,
-				"포인트 잔액이 부족합니다."
-			);
+		if(usedPointAmount > totalPrice) {
+			throw new BusinessException(PointErrorCode.INVALID_POINT_AMOUNT, "주문 총액보다 사용 포인트가 더 많습니다");
 		}
 
 		// 4. 주문 저장

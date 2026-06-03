@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
+import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
@@ -62,6 +63,7 @@ public class Order extends BaseEntity {
 	}
 
 	public Order(Member member, Long totalPrice, List<OrderItem> orderItems, Long usedPointAmount, String orderNumber) {
+		validateUsedPointAmount(totalPrice, usedPointAmount);
 		this.member = member;
 		this.totalPrice = totalPrice;
 		this.usedPointAmount = usedPointAmount;
@@ -101,4 +103,20 @@ public class Order extends BaseEntity {
 		this.status = newStatus;
 	}
 
+	private void validateUsedPointAmount(Long totalPrice, Long usedPointAmount) {
+
+		if (usedPointAmount < 0) {
+			throw new BusinessException(
+				PointErrorCode.INVALID_POINT_AMOUNT,
+				"사용 포인트는 0 이상이어야 합니다."
+			);
+		}
+
+		if (usedPointAmount > totalPrice) {
+			throw new BusinessException(
+				PointErrorCode.INVALID_POINT_AMOUNT,
+				"사용 포인트는 주문 금액을 초과할 수 없습니다."
+			);
+		}
+	}
 }
