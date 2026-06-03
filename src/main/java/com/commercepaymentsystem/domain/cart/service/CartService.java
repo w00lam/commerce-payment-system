@@ -51,20 +51,6 @@ public class CartService {
 		return cartItemRepository.findAllByCartId(cartId);
 	}
 
-	public List<CartItem> getCartItemsByMemberId(Long memberId) {
-		return cartItemRepository.findAllByMemberId(memberId);
-	}
-
-	public List<CartItem> getCartItemsByMemberIdAndIds(
-		Long memberId,
-		List<Long> cartItemIds
-	) {
-		return cartItemRepository.findAllByMemberIdAndIdIn(
-			memberId,
-			cartItemIds
-		);
-	}
-
 	public Long getCartItemQuantity(Long memberId, Long productId) {
 		return cartRepository.findByMemberId(memberId)
 			.flatMap(cart -> cartItemRepository.findByCartIdAndProductId(cart.getId(), productId))
