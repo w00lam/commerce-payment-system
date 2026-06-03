@@ -1,6 +1,8 @@
 package com.commercepaymentsystem.domain.order.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,15 +14,18 @@ import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.service.MemberService;
 import com.commercepaymentsystem.domain.order.dto.GetOrderDetailResponse;
+import com.commercepaymentsystem.domain.order.dto.OrderCancelResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderItemCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
+import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
+import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
@@ -141,6 +146,30 @@ public class OrderFacade {
 			.orElse(null);
 
 		return GetOrderDetailResponse.of(order, payment);
+	}
+
+	@Transactional
+	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
+		Order order = orderService.getMyOrderDetailForUpdate(orderId, memberId);
+
+		Payment payment = paymentService.getPendingPaymentByOrderIdForUpdate(
+			order.getId(),
+			memberId
+		);
+
+		orderService.cancelOrder(order);
+		paymentService.failPayment(payment);
+
+		Map<Long, Long> orderItemQuantities = order.getOrderItems().stream()
+			.collect(Collectors.toMap(
+				OrderItem::getId,
+				OrderItem::getQuantity,
+				Long::sum
+			));
+
+		orderService.restoreProductStock(order, orderItemQuantities);
+
+		return OrderCancelResponse.from(order);
 	}
 
 	private List<CartItem> getPreviewCartItems(

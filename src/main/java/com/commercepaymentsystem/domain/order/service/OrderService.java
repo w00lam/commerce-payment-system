@@ -87,6 +87,12 @@ public class OrderService {
 		}
 	}
 
+	@Transactional
+	public Order getMyOrderDetailForUpdate(Long orderId, Long memberId) {
+		return orderRepository.findByIdAndMemberIdWithOrderItemsForUpdate(orderId, memberId)
+			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+	}
+
 	/**
 	 * 환불 처리 시 주문 상품 정보를 바탕으로 상품 식별자를 추출하고 ProductService를 호출하여 비관적 락 기반의 안전한 재고 복구를 수행합니다.
 	 *
