@@ -136,7 +136,7 @@ public class OrderFacade {
 
 	public GetOrderDetailResponse getOrderDetail(Long memberId, Long orderId) {
 
-		Order order = orderService.getMyOrderDetail(memberId, orderId);
+		Order order = orderService.getMyOrderDetail(orderId, memberId);
 		PaymentCreateResult payment = paymentService.findPaymentByOrderId(order.getId())
 			.orElse(null);
 
@@ -182,4 +182,6 @@ public class OrderFacade {
 
 		return cartItems;
 	}
+
+
 }
