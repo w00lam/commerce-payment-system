@@ -190,21 +190,24 @@ class OrderFacadeTest {
 	}
 
 	@Test
-	@DisplayName("주문서 미리보기에서 선택한 장바구니 상품 일부가 없으면 예외가 발생한다.")
-	void previewOrder_SelectedCartItemNotFound_ThrowsException() {
+	@DisplayName("주문서 미리보기에서 장바구니가 비어 있으면 빈 응답을 반환한다.")
+	void previewOrder_EmptyCart_ReturnsEmptyResponse() {
 		// given
 		Long memberId = 1L;
-		OrderPreviewRequest request = new OrderPreviewRequest(List.of(1L, 2L));
-		CartItem cartItem = createCartItem(1L, memberId, 100L, 1L);
+		OrderPreviewRequest request = new OrderPreviewRequest(List.of());
 
-		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
-			.thenReturn(List.of(cartItem));
+		when(cartService.findCartEntities(memberId))
+			.thenReturn(List.of());
 
-		// when & then
-		assertThatThrownBy(() -> orderFacade.previewOrder(memberId, request))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.getMessage());
+		// when
+		OrderPreviewResponse response = orderFacade.previewOrder(memberId, request);
 
+		// then
+		assertThat(response.memberId()).isEqualTo(memberId);
+		assertThat(response.totalAmount()).isZero();
+		assertThat(response.items()).isEmpty();
+
+		verify(cartService).findCartEntities(memberId);
 		verify(productService, never()).getProduct(any());
 	}
 
