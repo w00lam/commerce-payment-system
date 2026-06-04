@@ -160,14 +160,15 @@ public class OrderFacade {
 		orderService.cancelOrder(order);
 		paymentService.failPayment(payment);
 
-		Map<Long, Long> orderItemQuantities = order.getOrderItems().stream()
+		Map<Long, Long> productQuantities = order.getOrderItems().stream()
 			.collect(Collectors.toMap(
-				OrderItem::getId,
+				orderItem -> orderItem.getProduct().getId(),
 				OrderItem::getQuantity,
 				Long::sum
 			));
 
-		productService.restoreProductStocks(orderItemQuantities);
+		productService.restoreProductStocks(productQuantities);
+
 		return OrderCancelResponse.from(order);
 	}
 
