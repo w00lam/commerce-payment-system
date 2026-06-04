@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -43,6 +44,7 @@ import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelRequest;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelResponse;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
+import com.commercepaymentsystem.domain.payment.service.PaymentPostProcessService;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.refund.service.RefundService;
@@ -55,12 +57,14 @@ class RefundFacadeTest {
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
 	private final PointService pointService = mock(PointService.class);
 	private final ProductService productService = mock(ProductService.class);
+	private final PaymentPostProcessService paymentPostProcessService = mock(PaymentPostProcessService.class);
 	private final TransactionOperations transactionOperations = mock(TransactionOperations.class);
 
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		null,
-		null
+		null,
+		paymentPostProcessService
 	);
 
 	private final OrderService orderService = new OrderService(
@@ -75,6 +79,7 @@ class RefundFacadeTest {
 		paymentService,
 		orderService,
 		pointService,
+		productService,
 		portOneClient,
 		transactionOperations
 	);
@@ -116,6 +121,7 @@ class RefundFacadeTest {
 		assertThat(requestCaptor.getValue().currentCancellableAmount()).isEqualTo(8_000L);
 		verify(pointService).restorePoint(1L, 1_000L, 100L, 1000L);
 		verify(pointService).revokeEarnedPoint(1L, 40L, 100L, 1000L);
+		verify(productService).restoreProductStocks(Map.of(10L, 1L));
 	}
 
 	@Test
@@ -149,6 +155,7 @@ class RefundFacadeTest {
 		assertThat(result.pgRefundAmount()).isEqualTo(4_000L);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
 		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+		verify(productService).restoreProductStocks(Map.of(10L, 1L));
 		verify(pointService).revokeEarnedPoint(1L, 40L, 100L, 1001L);
 	}
 

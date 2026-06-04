@@ -34,11 +34,19 @@ public class OrderItem extends BaseEntity {
 	@Column(nullable = false, columnDefinition = "int UNSIGNED")
 	private Long quantity;
 
+	@Column(name = "source_cart_item_id")
+	private Long sourceCartItemId;
+
 	public OrderItem(Product product, Long orderPrice, Long quantity) {
+		this(product, orderPrice, quantity, null);
+	}
+
+	public OrderItem(Product product, Long orderPrice, Long quantity, Long sourceCartItemId) {
 		this.product = product;
 		this.productName = product.getName();
 		this.orderPrice = orderPrice;
 		this.quantity = quantity;
+		this.sourceCartItemId = sourceCartItemId;
 	}
 
 	void setOrder(Order order) {

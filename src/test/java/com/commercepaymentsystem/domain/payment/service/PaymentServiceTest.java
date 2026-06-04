@@ -29,11 +29,13 @@ class PaymentServiceTest {
 	private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 	private final PaymentIdGenerator paymentIdGenerator = mock(PaymentIdGenerator.class);
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
+	private final PaymentPostProcessService paymentPostProcessService = mock(PaymentPostProcessService.class);
 
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		paymentIdGenerator,
-		portOneClient
+		portOneClient,
+		paymentPostProcessService
 	);
 
 	@Test
