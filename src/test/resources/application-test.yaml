@@ -28,3 +28,5 @@ portone:
   channel-key: "test_channel_key"
   connect-timeout: 1s
   read-timeout: 3s
+  webhook:
+    secret: "whsec_d2ViaG9va190ZXN0X3NlY3JldA=="
