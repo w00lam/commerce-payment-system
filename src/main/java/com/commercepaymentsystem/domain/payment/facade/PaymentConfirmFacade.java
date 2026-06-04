@@ -1,4 +1,4 @@
-package com.commercepaymentsystem.domain.payment.service;
+package com.commercepaymentsystem.domain.payment.facade;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
+import com.commercepaymentsystem.domain.payment.service.PaymentPostProcessService;
+import com.commercepaymentsystem.domain.payment.service.PaymentService;
 
 import lombok.RequiredArgsConstructor;
 

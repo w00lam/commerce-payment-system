@@ -19,7 +19,7 @@ import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
-import com.commercepaymentsystem.domain.order.service.OrderFacade;
+import com.commercepaymentsystem.domain.order.facade.OrderFacade;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.global.response.ApiResponse;
 import com.commercepaymentsystem.global.response.PageResponse;

@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
-import com.commercepaymentsystem.domain.payment.service.PaymentConfirmFacade;
+import com.commercepaymentsystem.domain.payment.facade.PaymentConfirmFacade;
 import com.commercepaymentsystem.global.response.ApiResponse;
 
 import lombok.RequiredArgsConstructor;
