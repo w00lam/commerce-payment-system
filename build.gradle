@@ -23,6 +23,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'io.portone:server-sdk:0.24.0'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
@@ -42,4 +43,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    environment "PORTONE_WEBHOOK_SECRET", "whsec_d2ViaG9va190ZXN0X3NlY3JldA=="
 }
