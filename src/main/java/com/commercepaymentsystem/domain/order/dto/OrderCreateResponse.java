@@ -9,6 +9,7 @@ public record OrderCreateResponse(
 
 	Long orderId,
 	String orderNumber,
+	String paymentOrderName,
 	Long memberId,
 	Long totalAmount,
 	Long usedPointAmount,

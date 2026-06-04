@@ -21,4 +21,8 @@ public class OrderNumberGenerator {
 
 		return "ORD-" + timestamp + "-" + suffix;
 	}
+
+	public String generateName(Long orderId) {
+		return "order-" + orderId;
+	}
 }

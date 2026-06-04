@@ -52,7 +52,7 @@ public enum RefundStatus {
 	}
 
 	public RefundStatus failPostProcess() {
-		// Use this only after PG cancellation succeeds and internal post-processing fails.
+		// PG 취소 성공 후 내부 후처리가 실패한 경우에만 사용합니다.
 		if (this != PROCESSING) {
 			throw new RefundException(RefundErrorCode.INVALID_REFUND_STATUS);
 		}

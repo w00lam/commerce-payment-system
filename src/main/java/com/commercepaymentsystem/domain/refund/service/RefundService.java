@@ -289,8 +289,7 @@ public class RefundService {
 	}
 
 	private boolean isRefundedOrPgCancelled(Refund refund) {
-		// PROCESSING is only an in-flight reservation. Count only refunds that are completed
-		// or whose PG cancellation has already succeeded.
+		// PROCESSING은 진행 중 예약 상태이므로, 완료되었거나 PG 취소가 성공한 환불만 누적 금액에 반영합니다.
 		return refund.getStatus() == RefundStatus.COMPLETED
 			|| refund.getStatus() == RefundStatus.POST_PROCESS_FAILED;
 	}
