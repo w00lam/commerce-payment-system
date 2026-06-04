@@ -132,4 +132,12 @@ public class Payment extends BaseEntity {
 	public void markRefunded() {
 		this.status = this.status.refund();
 	}
+
+	public boolean isPending() {
+		return this.status.isPending();
+	}
+
+	public void fail() {
+		this.status = this.status.fail();
+	}
 }

@@ -5,11 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +25,7 @@ import com.commercepaymentsystem.domain.cart.exception.CartErrorCode;
 import com.commercepaymentsystem.domain.cart.service.CartService;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.service.MemberService;
+import com.commercepaymentsystem.domain.order.dto.OrderCancelResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateRequest;
 import com.commercepaymentsystem.domain.order.dto.OrderCreateResponse;
 import com.commercepaymentsystem.domain.order.dto.OrderPreviewRequest;
@@ -38,7 +38,10 @@ import com.commercepaymentsystem.domain.order.service.OrderFacade;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
+import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
+import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
+import com.commercepaymentsystem.domain.payment.exception.PaymentException;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
@@ -118,6 +121,22 @@ class OrderFacadeTest {
 		return cartItem;
 	}
 
+	private OrderItem createOrderItem(
+		Long id,
+		Product product,
+		Long quantity
+	) {
+		OrderItem orderItem = new OrderItem(
+			product,
+			product.getPrice(),
+			quantity
+		);
+
+		ReflectionTestUtils.setField(orderItem, "id", id);
+
+		return orderItem;
+	}
+
 	private Order createSavedOrder(
 		Member member,
 		List<OrderItem> orderItems,
@@ -135,6 +154,29 @@ class OrderFacadeTest {
 		ReflectionTestUtils.setField(order, "id", 1000L);
 
 		return order;
+	}
+
+	private Payment createPendingPayment(
+		Long id,
+		String paymentId,
+		Long memberId,
+		Long orderId,
+		Long totalOrderAmount,
+		Long usedPointAmount,
+		Long finalPaymentAmount
+	) {
+		Payment payment = Payment.create(
+			paymentId,
+			memberId,
+			orderId,
+			totalOrderAmount,
+			usedPointAmount,
+			finalPaymentAmount
+		);
+
+		ReflectionTestUtils.setField(payment, "id", id);
+
+		return payment;
 	}
 
 	@Test
@@ -559,5 +601,183 @@ class OrderFacadeTest {
 		);
 		verify(paymentService, never()).createPendingPayment(any());
 		verify(cartService, never()).clearCartItems(anyList(), any());
+	}
+
+	@Test
+	@DisplayName("주문 취소 시 주문과 결제를 취소 처리하고 상품 재고를 복구한다.")
+	void cancelOrder_PendingPayment_Success() {
+		// given
+		Long memberId = 1L;
+		Long orderId = 1000L;
+
+		Product product = mock(Product.class);
+		when(product.getId()).thenReturn(10L);
+
+		OrderItem orderItem = mock(OrderItem.class);
+		when(orderItem.getProduct()).thenReturn(product);
+		when(orderItem.getQuantity()).thenReturn(2L);
+
+		Order order = mock(Order.class);
+		when(order.getId()).thenReturn(orderId);
+		when(order.getOrderItems()).thenReturn(List.of(orderItem));
+
+		Payment payment = mock(Payment.class);
+
+		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
+			.thenReturn(order);
+
+		when(paymentService.getPendingPaymentByOrderIdForUpdate(order.getId(), memberId))
+			.thenReturn(payment);
+
+		// when
+		OrderCancelResponse response = orderFacade.cancelOrder(memberId, orderId);
+
+		// then
+		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
+		verify(paymentService).getPendingPaymentByOrderIdForUpdate(order.getId(), memberId);
+
+		verify(orderService).cancelOrder(order);
+		verify(paymentService).failPayment(payment);
+
+		ArgumentCaptor<Map<Long, Long>> productQuantitiesCaptor =
+			ArgumentCaptor.forClass(Map.class);
+
+		verify(productService).restoreProductStocks(productQuantitiesCaptor.capture());
+
+		Map<Long, Long> productQuantities = productQuantitiesCaptor.getValue();
+
+		assertThat(productQuantities)
+			.containsEntry(product.getId(), orderItem.getQuantity());
+
+		assertThat(response).isNotNull();
+	}
+
+	@Test
+	@DisplayName("주문 취소 시 주문을 찾지 못하면 결제 조회와 재고 복구를 수행하지 않는다.")
+	void cancelOrder_OrderNotFound_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long orderId = 1000L;
+
+		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
+			.thenThrow(new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.cancelOrder(memberId, orderId))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(OrderErrorCode.ORDER_NOT_FOUND.getMessage());
+
+		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
+		verify(paymentService, never()).getPendingPaymentByOrderIdForUpdate(any(), any());
+		verify(orderService, never()).cancelOrder(any());
+		verify(paymentService, never()).failPayment(any());
+		verify(orderService, never()).restoreProductStock(any(), any());
+	}
+
+	@Test
+	@DisplayName("주문 취소 시 결제가 대기 상태가 아니면 주문 취소와 재고 복구를 수행하지 않는다.")
+	void cancelOrder_PaymentNotPending_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long orderId = 1000L;
+
+		Member member = createMember(memberId, 5000L);
+
+		Product product = createProduct(
+			100L,
+			"키보드",
+			30000L,
+			10L,
+			ProductStatus.ON_SALE
+		);
+
+		OrderItem orderItem = createOrderItem(
+			10L,
+			product,
+			2L
+		);
+
+		Order order = createSavedOrder(
+			member,
+			List.of(orderItem),
+			60000L,
+			1000L
+		);
+
+		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
+			.thenReturn(order);
+		when(paymentService.getPendingPaymentByOrderIdForUpdate(orderId, memberId))
+			.thenThrow(new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS));
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.cancelOrder(memberId, orderId))
+			.isInstanceOf(PaymentException.class)
+			.hasMessage(PaymentErrorCode.INVALID_PAYMENT_STATUS.getMessage());
+
+		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
+		verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
+		verify(orderService, never()).cancelOrder(any());
+		verify(paymentService, never()).failPayment(any());
+		verify(orderService, never()).restoreProductStock(any(), any());
+	}
+
+	@Test
+	@DisplayName("주문 취소 시 주문 상태 전이가 불가능하면 결제 실패 처리와 재고 복구를 수행하지 않는다.")
+	void cancelOrder_InvalidOrderStatus_ThrowsException() {
+		// given
+		Long memberId = 1L;
+		Long orderId = 1000L;
+
+		Member member = createMember(memberId, 5000L);
+
+		Product product = createProduct(
+			100L,
+			"키보드",
+			30000L,
+			10L,
+			ProductStatus.ON_SALE
+		);
+
+		OrderItem orderItem = createOrderItem(
+			10L,
+			product,
+			2L
+		);
+
+		Order order = createSavedOrder(
+			member,
+			List.of(orderItem),
+			60000L,
+			1000L
+		);
+
+		Payment payment = createPendingPayment(
+			100L,
+			"PAY-20260604-000001",
+			memberId,
+			orderId,
+			60000L,
+			1000L,
+			59000L
+		);
+
+		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
+			.thenReturn(order);
+		when(paymentService.getPendingPaymentByOrderIdForUpdate(orderId, memberId))
+			.thenReturn(payment);
+		doThrow(new BusinessException(OrderErrorCode.INVALID_ORDER_STATUS))
+			.when(orderService)
+			.cancelOrder(order);
+
+		// when & then
+		assertThatThrownBy(() -> orderFacade.cancelOrder(memberId, orderId))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage(OrderErrorCode.INVALID_ORDER_STATUS.getMessage());
+
+		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
+		verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
+		verify(orderService).cancelOrder(order);
+		verify(paymentService, never()).failPayment(any());
+		verify(orderService, never()).restoreProductStock(any(), any());
 	}
 }

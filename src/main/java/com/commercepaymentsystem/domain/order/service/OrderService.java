@@ -6,18 +6,21 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.commercepaymentsystem.domain.cart.entity.CartItem;
 import com.commercepaymentsystem.domain.member.entity.Member;
+import com.commercepaymentsystem.domain.order.dto.GetOrderResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
 import com.commercepaymentsystem.domain.order.repository.OrderRepository;
 import com.commercepaymentsystem.domain.product.entity.Product;
-import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.global.exception.BusinessException;
+import com.commercepaymentsystem.global.response.PageResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,7 +30,6 @@ public class OrderService {
 
 	private final OrderRepository orderRepository;
 	private final OrderNumberGenerator orderNumberGenerator;
-	private final ProductService productService;
 
 	@Transactional
 	public Order createOrder(Member member, List<CartItem> cartItems, List<Product> products, Long usedPointAmount) {
@@ -42,6 +44,19 @@ public class OrderService {
 		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
 		Order order = new Order(member, totalPrice, orderItems, usedPointAmount, orderNumberGenerator.generate());
 		return orderRepository.save(order);
+	}
+
+	// 내 주문 목록 조회
+	public PageResponse<GetOrderResponse> getOrders(Long memberId, Pageable pageable) {
+		Page<Order> orders = orderRepository.findByMember_Id(memberId, pageable);
+
+		return PageResponse.from(orders.map(GetOrderResponse::from));
+	}
+
+	public Order getMyOrderDetail(Long orderId, Long memberId) {
+		return orderRepository.findByIdAndMemberIdWithOrderItems(orderId, memberId).orElseThrow(
+			() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND)
+		);
 	}
 
 	// 주문 상태 변경 (CONFIRMED)
@@ -68,11 +83,18 @@ public class OrderService {
 		}
 	}
 
+	@Transactional
+	public Order getMyOrderDetailForUpdate(Long orderId, Long memberId) {
+		return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
+			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+	}
+
 	/**
 	 * 환불 처리 시 주문 상품 정보를 바탕으로 상품 식별자를 추출하고 ProductService를 호출하여 비관적 락 기반의 안전한 재고 복구를 수행합니다.
 	 *
-	 * @param order 주문 엔티티 객체
+	 * @param order            주문 엔티티 객체
 	 * @param refundQuantities 주문 상품 식별자(ID)와 복구할 환불 수량의 매핑 정보
+	 * @return
 	 */
 	@Transactional
 	public void restoreProductStock(Order order, Map<Long, Long> refundQuantities) {
@@ -86,6 +108,5 @@ public class OrderService {
 			}
 			productQuantities.merge(orderItem.getProductId(), refundQuantity.getValue(), Long::sum);
 		}
-		productService.restoreProductStocks(productQuantities);
 	}
 }

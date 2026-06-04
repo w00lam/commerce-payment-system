@@ -2,6 +2,7 @@ package com.commercepaymentsystem.domain.payment.service;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -307,5 +308,36 @@ public class PaymentService {
 		} else {
 			payment.markPartiallyRefunded();
 		}
+	}
+
+	@Transactional
+	public Payment getPendingPaymentByOrderIdForUpdate(Long orderId, Long memberId) {
+		validateOrderId(orderId);
+		validateMemberId(memberId);
+
+		Payment payment = paymentRepository.findByOrderIdForUpdate(orderId)
+			.orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+		validateOwner(payment, memberId);
+
+		if (!payment.isPending()) {
+			throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+		}
+
+		return payment;
+	}
+
+	@Transactional
+	public void failPayment(Payment payment) {
+		if (!payment.isPending()) {
+			throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+		}
+
+		payment.fail();
+	}
+
+	@Transactional(readOnly = true)
+	public Optional<PaymentCreateResult> findPaymentByOrderId(Long orderId) {
+		return paymentRepository.findByOrderId(orderId).map(PaymentCreateResult::from);
 	}
 }

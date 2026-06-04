@@ -65,8 +65,7 @@ class RefundFacadeTest {
 
 	private final OrderService orderService = new OrderService(
 		orderRepository,
-		null,
-		productService
+		null
 	);
 
 	private final RefundService refundService = new RefundService(refundRepository);
