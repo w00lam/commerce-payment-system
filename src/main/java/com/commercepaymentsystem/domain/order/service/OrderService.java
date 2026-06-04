@@ -38,7 +38,7 @@ public class OrderService {
 		List<OrderItem> orderItems = cartItems.stream()
 			.map(cartItem -> {
 				Product product = productMap.get(cartItem.getProductId());
-				return new OrderItem(product, product.getPrice(), cartItem.getQuantity());
+				return new OrderItem(product, product.getPrice(), cartItem.getQuantity(), cartItem.getId());
 			})
 			.toList();
 		long totalPrice = orderItems.stream().mapToLong(OrderItem::getSubtotal).sum();
@@ -77,6 +77,12 @@ public class OrderService {
 			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 	}
 
+	@Transactional(readOnly = true)
+	public Order getOrderByIdWithOrderItems(Long orderId) {
+		return orderRepository.findWithOrderItemsById(orderId)
+			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
+	}
+
 	public void validateOwner(Order order, Long memberId) {
 		if (!Objects.equals(order.getMemberId(), memberId)) {
 			throw new BusinessException(OrderErrorCode.ORDER_OWNER_MISMATCH);
@@ -97,7 +103,7 @@ public class OrderService {
 	 * @return
 	 */
 	@Transactional
-	public void restoreProductStock(Order order, Map<Long, Long> refundQuantities) {
+	public Map<Long, Long> restoreProductStock(Order order, Map<Long, Long> refundQuantities) {
 		Map<Long, OrderItem> orderItems = order.getOrderItems().stream()
 			.collect(Collectors.toMap(OrderItem::getId, Function.identity()));
 		Map<Long, Long> productQuantities = new java.util.HashMap<>();
@@ -108,5 +114,6 @@ public class OrderService {
 			}
 			productQuantities.merge(orderItem.getProductId(), refundQuantity.getValue(), Long::sum);
 		}
+		return productQuantities;
 	}
 }

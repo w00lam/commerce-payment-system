@@ -150,12 +150,12 @@ public class OrderFacade {
 
 	@Transactional
 	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
-		Order order = orderService.getMyOrderDetailForUpdate(orderId, memberId);
-
 		Payment payment = paymentService.getPendingPaymentByOrderIdForUpdate(
-			order.getId(),
+			orderId,
 			memberId
 		);
+
+		Order order = orderService.getMyOrderDetailForUpdate(orderId, memberId);
 
 		orderService.cancelOrder(order);
 		paymentService.failPayment(payment);
