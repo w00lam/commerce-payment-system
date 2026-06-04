@@ -14,7 +14,9 @@ import com.commercepaymentsystem.domain.cart.repository.CartRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -95,10 +97,23 @@ public class CartService {
 		return cartItemRepository.findByIdInAndCartMemberIdWithCart(cartItemIds, memberId);
 	}
 
+	/**
+	 * 결제 완료되어 주문 상품으로 등록된 장바구니 항목들을 일괄 제거합니다.
+	 * 이미 지워진 항목이 존재하더라도 비즈니스 롤백을 막기 위해 경고 로그로 남기고 성공 처리합니다.
+	 *
+	 * @param orderedItemIds 결제 완료된 장바구니 항목 식별자 목록
+	 * @param memberId       회원 식별자
+	 */
+	@Transactional
 	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {
 		int deleted = cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId);
 		if (deleted != orderedItemIds.size()) {
-			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+			log.warn(
+				"결제 후 장바구니 정리 일부 실패: memberId={}, requested={}, deleted={}",
+				memberId,
+				orderedItemIds.size(),
+				deleted
+			);
 		}
 	}
 }

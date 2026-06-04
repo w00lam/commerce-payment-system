@@ -208,7 +208,7 @@ class PaymentServiceTest {
 	@Test
 	@DisplayName("Payment confirmation rejects blank payment id")
 	void confirmPayment_blankPaymentId_fail() {
-		PaymentConfirmCommand command = new PaymentConfirmCommand(" ", 1L);
+		PaymentConfirmCommand command = PaymentConfirmCommand.of(" ", 1L);
 
 		assertPaymentException(
 			() -> paymentService.confirmPayment(command),
@@ -220,7 +220,7 @@ class PaymentServiceTest {
 	@Test
 	@DisplayName("Payment confirmation rejects invalid JWT member id")
 	void confirmPayment_invalidMemberId_fail() {
-		PaymentConfirmCommand command = new PaymentConfirmCommand("payment-123", null);
+		PaymentConfirmCommand command = PaymentConfirmCommand.of("payment-123", null);
 
 		assertPaymentException(
 			() -> paymentService.confirmPayment(command),
@@ -247,14 +247,14 @@ class PaymentServiceTest {
 		when(portOneClient.getPayment("payment-123")).thenReturn(portOnePayment);
 
 		// when
-		PaymentConfirmResult result = paymentService.confirmPayment(
-			new PaymentConfirmCommand("payment-123", 1L)
+		Payment result = paymentService.confirmPayment(
+			PaymentConfirmCommand.of("payment-123", 1L)
 		);
 
 		// then
-		assertThat(result.paymentId()).isEqualTo("payment-123");
-		assertThat(result.status()).isEqualTo(PaymentStatus.CONFIRMED);
-		assertThat(result.paidAt()).isEqualTo(paidAt);
+		assertThat(result.getPaymentId()).isEqualTo("payment-123");
+		assertThat(result.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		assertThat(result.getPaidAt()).isEqualTo(paidAt);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
 		assertThat(payment.getPaidAt()).isEqualTo(paidAt);
 	}
@@ -270,13 +270,13 @@ class PaymentServiceTest {
 		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
 
 		// when
-		PaymentConfirmResult result = paymentService.confirmPayment(
-			new PaymentConfirmCommand("payment-123", 1L)
+		Payment result = paymentService.confirmPayment(
+			PaymentConfirmCommand.of("payment-123", 1L)
 		);
 
 		// then
-		assertThat(result.status()).isEqualTo(PaymentStatus.CONFIRMED);
-		assertThat(result.paidAt()).isEqualTo(paidAt);
+		assertThat(result.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		assertThat(result.getPaidAt()).isEqualTo(paidAt);
 		verify(portOneClient, never()).getPayment(anyString());
 	}
 
@@ -289,7 +289,7 @@ class PaymentServiceTest {
 
 		// when & then
 		assertPaymentException(
-			() -> paymentService.confirmPayment(new PaymentConfirmCommand("payment-123", 2L)),
+			() -> paymentService.confirmPayment(PaymentConfirmCommand.of("payment-123", 2L)),
 			PaymentErrorCode.PAYMENT_OWNER_MISMATCH
 		);
 		verify(portOneClient, never()).getPayment(anyString());
@@ -313,7 +313,7 @@ class PaymentServiceTest {
 
 		// when & then
 		assertPaymentException(
-			() -> paymentService.confirmPayment(new PaymentConfirmCommand("payment-123", 1L)),
+			() -> paymentService.confirmPayment(PaymentConfirmCommand.of("payment-123", 1L)),
 			PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED
 		);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);

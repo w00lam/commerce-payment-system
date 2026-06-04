@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
-import com.commercepaymentsystem.domain.payment.service.PaymentService;
+import com.commercepaymentsystem.domain.payment.service.PaymentConfirmFacade;
 import com.commercepaymentsystem.global.response.ApiResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -18,15 +18,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PaymentController {
 
-	private final PaymentService paymentService;
+	private final PaymentConfirmFacade paymentConfirmFacade;
 
 	@PostMapping("/{paymentId}/confirm")
 	public ApiResponse<PaymentConfirmResult> confirmPayment(
 		@PathVariable String paymentId,
 		@AuthenticationPrincipal Long memberId
 	) {
-		PaymentConfirmCommand command = new PaymentConfirmCommand(paymentId, memberId);
-		PaymentConfirmResult response = paymentService.confirmPayment(command);
+		PaymentConfirmCommand command = PaymentConfirmCommand.of(paymentId, memberId);
+		PaymentConfirmResult response = paymentConfirmFacade.confirm(command);
 
 		return ApiResponse.ok(response);
 	}

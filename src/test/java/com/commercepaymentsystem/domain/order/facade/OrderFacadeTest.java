@@ -14,9 +14,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.commercepaymentsystem.domain.cart.entity.Cart;
@@ -633,8 +636,9 @@ class OrderFacadeTest {
 		OrderCancelResponse response = orderFacade.cancelOrder(memberId, orderId);
 
 		// then
-		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
-		verify(paymentService).getPendingPaymentByOrderIdForUpdate(order.getId(), memberId);
+		InOrder inOrder = inOrder(paymentService, orderService);
+		inOrder.verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
+		inOrder.verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
 
 		verify(orderService).cancelOrder(order);
 		verify(paymentService).failPayment(payment);
@@ -658,8 +662,11 @@ class OrderFacadeTest {
 		// given
 		Long memberId = 1L;
 		Long orderId = 1000L;
+		Payment payment = mock(Payment.class);
 
-		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
+		when(paymentService.getPendingPaymentByOrderIdForUpdate(orderId, memberId))
+			.thenReturn(payment);
+		lenient().when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
 			.thenThrow(new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 
 		// when & then
@@ -667,8 +674,8 @@ class OrderFacadeTest {
 			.isInstanceOf(BusinessException.class)
 			.hasMessage(OrderErrorCode.ORDER_NOT_FOUND.getMessage());
 
+		verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
 		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
-		verify(paymentService, never()).getPendingPaymentByOrderIdForUpdate(any(), any());
 		verify(orderService, never()).cancelOrder(any());
 		verify(paymentService, never()).failPayment(any());
 		verify(orderService, never()).restoreProductStock(any(), any());
@@ -676,6 +683,7 @@ class OrderFacadeTest {
 
 	@Test
 	@DisplayName("주문 취소 시 결제가 대기 상태가 아니면 주문 취소와 재고 복구를 수행하지 않는다.")
+	@MockitoSettings(strictness = Strictness.LENIENT)
 	void cancelOrder_PaymentNotPending_ThrowsException() {
 		// given
 		Long memberId = 1L;
@@ -714,8 +722,8 @@ class OrderFacadeTest {
 			.isInstanceOf(PaymentException.class)
 			.hasMessage(PaymentErrorCode.INVALID_PAYMENT_STATUS.getMessage());
 
-		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
 		verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
+		verify(orderService, never()).getMyOrderDetailForUpdate(any(), any());
 		verify(orderService, never()).cancelOrder(any());
 		verify(paymentService, never()).failPayment(any());
 		verify(orderService, never()).restoreProductStock(any(), any());

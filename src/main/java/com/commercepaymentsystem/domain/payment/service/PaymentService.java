@@ -76,14 +76,14 @@ public class PaymentService {
 	 * @throws PaymentException 결제가 없거나 소유권, 상태, PortOne 검증이 실패한 경우
 	 */
 	@Transactional
-	public PaymentConfirmResult confirmPayment(PaymentConfirmCommand command) {
+	public Payment confirmPayment(PaymentConfirmCommand command) {
 		validateConfirmCommand(command);
 
 		Payment payment = loadPaymentForConfirm(command.paymentId());
 		validateOwner(payment, command.memberId());
 
 		if (payment.isConfirmed()) {
-			return PaymentConfirmResult.from(payment);
+			return payment;
 		}
 
 		validateConfirmableStatus(payment);
@@ -93,7 +93,7 @@ public class PaymentService {
 
 		payment.confirm(resolvePaidAt(portOnePayment));
 
-		return PaymentConfirmResult.from(payment);
+		return payment;
 	}
 
 	/**

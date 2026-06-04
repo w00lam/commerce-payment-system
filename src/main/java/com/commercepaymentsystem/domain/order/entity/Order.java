@@ -87,6 +87,10 @@ public class Order extends BaseEntity {
 	}
 
 	public void markAsConfirmed() {
+		if (this.status == OrderStatus.CONFIRMED) {
+			return;
+		}
+
 		changeStatus(OrderStatus.CONFIRMED);
 	}
 

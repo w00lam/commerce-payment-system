@@ -12,6 +12,7 @@ import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.point.service.PointService;
+import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.domain.refund.dto.RefundCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundResult;
 import com.commercepaymentsystem.domain.refund.entity.Refund;
@@ -38,6 +39,7 @@ public class RefundFacade {
 	private final PaymentService paymentService;
 	private final OrderService orderService;
 	private final PointService pointService;
+	private final ProductService productService;
 	private final PortOneClient portOneClient;
 	private final TransactionOperations transactionOperations;
 
@@ -51,11 +53,24 @@ public class RefundFacade {
 	public RefundResult refundPayment(RefundCommand command) {
 		refundService.validateCommand(command);
 
-		CompletedRefund completedRefund = transactionOperations.execute(status -> {
+		PreparedRefund preparedRefund = transactionOperations.execute(status -> {
 			Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
 			Order order = orderService.getOrderById(payment.getOrderId());
 			orderService.validateOwner(order, command.memberId());
-			PreparedRefund preparedRefund = refundService.prepareRefund(command, payment, order);
+			return refundService.prepareRefund(command, payment, order);
+		});
+
+		try {
+			cancelPgPayment(preparedRefund);
+		} catch (PortOneException exception) {
+			failRefund(preparedRefund, exception);
+			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
+		}
+
+		return transactionOperations.execute(status -> {
+			Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
+			Order order = orderService.getOrderById(payment.getOrderId());
+			orderService.validateOwner(order, command.memberId());
 			Refund refund = refundService.completeRefund(preparedRefund.refundId());
 			List<Refund> existingRefunds = refundService.getExistingRefunds(payment.getId());
 			boolean isFullRefund = refundService.isFullRefund(
@@ -65,31 +80,14 @@ public class RefundFacade {
 				refund
 			);
 
-			orderService.restoreProductStock(order, refundQuantities(refund));
+			Map<Long, Long> productQuantities = orderService.restoreProductStock(order, refundQuantities(refund));
+			productService.restoreProductStocks(productQuantities);
 			restorePoint(payment, refund);
 			revokeEarnedPoint(payment, refund, isFullRefund);
 			updatePaymentAndOrderStatus(payment, order, isFullRefund);
 
-			return new CompletedRefund(
-				preparedRefund,
-				RefundResult.from(refund, preparedRefund.portOnePaymentId())
-			);
+			return RefundResult.from(refund, preparedRefund.portOnePaymentId());
 		});
-
-		try {
-			cancelPgPayment(completedRefund.preparedRefund());
-		} catch (PortOneException exception) {
-			log.error(
-				"PortOne refund failed. refundId={}, paymentId={}, pgAmount={}",
-				completedRefund.preparedRefund().refundId(),
-				completedRefund.preparedRefund().portOnePaymentId(),
-				completedRefund.preparedRefund().pgAmount(),
-				exception
-			);
-			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
-		}
-
-		return completedRefund.result();
 	}
 
 	private void cancelPgPayment(PreparedRefund preparedRefund) {
@@ -107,6 +105,20 @@ public class RefundFacade {
 				CANCEL_REQUESTER
 			)
 		);
+	}
+
+	private void failRefund(PreparedRefund preparedRefund, PortOneException exception) {
+		log.error(
+			"PortOne refund failed. refundId={}, paymentId={}, pgAmount={}",
+			preparedRefund.refundId(),
+			preparedRefund.portOnePaymentId(),
+			preparedRefund.pgAmount(),
+			exception
+		);
+		transactionOperations.execute(status -> {
+			refundService.failRefund(preparedRefund.refundId());
+			return null;
+		});
 	}
 
 	private void restorePoint(Payment payment, Refund refund) {
@@ -164,9 +176,5 @@ public class RefundFacade {
 			));
 	}
 
-	private record CompletedRefund(
-		PreparedRefund preparedRefund,
-		RefundResult result
-	) {
-	}
+
 }

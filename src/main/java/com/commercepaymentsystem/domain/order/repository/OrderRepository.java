@@ -29,11 +29,21 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 		@Param("orderId") Long orderId,
 		@Param("memberId") Long memberId);
 
+	@Query("""
+		SELECT DISTINCT o
+		FROM Order o
+		LEFT JOIN FETCH o.orderItems
+		WHERE o.id = :orderId
+	""")
+	Optional<Order> findWithOrderItemsById(@Param("orderId") Long orderId);
+
 	//
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
-	SELECT o
+	SELECT DISTINCT o
 	FROM Order o
+	LEFT JOIN FETCH o.orderItems oi
+	LEFT JOIN FETCH oi.product
 	WHERE o.id = :orderId
 	  AND o.member.id = :memberId
 """)
