@@ -55,7 +55,7 @@ public class RefundFacade {
 			cancelPgPayment(preparedRefund);
 		} catch (PortOneException exception) {
 			failRefund(preparedRefund, exception);
-			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
+			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception);
 		}
 
 		try {

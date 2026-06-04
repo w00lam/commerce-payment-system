@@ -21,7 +21,6 @@ import org.springframework.transaction.support.TransactionOperations;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
-import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.refund.dto.RefundCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundItemCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundResult;
@@ -54,7 +53,6 @@ class RefundFacadeTest {
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		null,
-		new OrderNumberGenerator(),
 		portOneClient
 	);
 
@@ -219,10 +217,11 @@ class RefundFacadeTest {
 		when(refundOrderPort.getRefundableOrder(10L, 1L)).thenReturn(orderInfo);
 		when(refundRepository.findByPaymentId(100L)).thenReturn(List.of());
 		stubRefundSaveAndFind(1002L);
+		PortOneException portOneException = new PortOneException("cancel failed");
 		when(portOneClient.cancelPayment(eq("payment-123"), any(PortOnePaymentCancelRequest.class)))
-			.thenThrow(new PortOneException("cancel failed"));
+			.thenThrow(portOneException);
 
-		assertRefundException(
+		assertThatThrownBy(
 			() -> refundFacade.refundPayment(
 				new RefundCommand(
 					"payment-123",
@@ -230,9 +229,12 @@ class RefundFacadeTest {
 					"customer request",
 					List.of(new RefundItemCommand(10L, 1L))
 				)
-			),
-			RefundErrorCode.PORTONE_REFUND_FAILED
-		);
+			)
+		)
+			.isInstanceOf(RefundException.class)
+			.hasMessage(RefundErrorCode.PORTONE_REFUND_FAILED.getMessage())
+			.extracting("errorCode", "cause")
+			.containsExactly(RefundErrorCode.PORTONE_REFUND_FAILED, portOneException);
 
 		ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
 		verify(refundRepository).save(refundCaptor.capture());

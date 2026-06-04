@@ -83,7 +83,7 @@ public class Order extends BaseEntity {
 		if (orderItems.isEmpty()) return "주문";
 		String firstName = orderItems.get(0).getProductName();
 		if (orderItems.size() == 1) return firstName;
-		return firstName + " 외 " + (orderItems.size() - 1) + "건";
+		return firstName + " 외 " + (orderItems.size() - 1) + "개";
 	}
 
 	public void markAsConfirmed() {

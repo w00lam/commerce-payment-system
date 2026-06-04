@@ -123,7 +123,7 @@ class PaymentPostProcessIntegrationTest {
 		when(portOneClient.getPayment(paymentCreateResult.paymentId()))
 			.thenReturn(portOnePayment(
 				paymentCreateResult.paymentId(),
-				"order-" + order.getId(),
+				paymentCreateResult.orderName(),
 				paymentCreateResult.finalPaymentAmount(),
 				paidAt
 			));

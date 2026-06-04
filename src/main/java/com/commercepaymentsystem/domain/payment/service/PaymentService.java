@@ -7,7 +7,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
@@ -32,7 +31,6 @@ public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
 	private final PaymentIdGenerator paymentIdGenerator;
-	private final OrderNumberGenerator orderNumberGenerator;
 	private final PortOneClient portOneClient;
 
 	/**
@@ -47,6 +45,7 @@ public class PaymentService {
 			paymentId,
 			command.memberId(),
 			command.orderId(),
+			command.orderName(),
 			command.totalOrderAmount(),
 			command.usedPointAmount(),
 			command.finalPaymentAmount()
@@ -93,6 +92,7 @@ public class PaymentService {
 
 		validateMemberId(command.memberId());
 		validateOrderId(command.orderId());
+		validateOrderName(command.orderName());
 		validateAmount(
 			command.totalOrderAmount(),
 			command.usedPointAmount(),
@@ -120,6 +120,12 @@ public class PaymentService {
 
 	private void validateOrderId(Long orderId) {
 		if (orderId == null || orderId <= 0) {
+			throw new PaymentException(PaymentErrorCode.INVALID_ORDER_ID);
+		}
+	}
+
+	private void validateOrderName(String orderName) {
+		if (orderName == null || orderName.isBlank()) {
 			throw new PaymentException(PaymentErrorCode.INVALID_ORDER_ID);
 		}
 	}
@@ -179,9 +185,9 @@ public class PaymentService {
 		try {
 			return portOneClient.getPayment(paymentId);
 		} catch (PortOneRetryableException exception) {
-			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_REQUEST_FAILED, exception.getMessage());
+			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_REQUEST_FAILED, exception);
 		} catch (PortOneException exception) {
-			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, exception.getMessage());
+			throw new PaymentException(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, exception);
 		}
 	}
 
@@ -200,7 +206,11 @@ public class PaymentService {
 	}
 
 	private String expectedOrderName(Payment payment) {
-		return orderNumberGenerator.generateName(payment.getOrderId());
+		if (payment.getOrderName() == null || payment.getOrderName().isBlank()) {
+			return "order-" + payment.getOrderId();
+		}
+
+		return payment.getOrderName();
 	}
 
 	private Instant resolvePaidAt(PortOnePaymentResponse portOnePayment) {

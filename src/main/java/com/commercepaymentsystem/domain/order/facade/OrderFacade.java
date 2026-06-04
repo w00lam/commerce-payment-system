@@ -23,7 +23,6 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
-import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
@@ -49,7 +48,6 @@ public class OrderFacade {
 	private final CartService cartService;
 	private final MemberService memberService;
 	private final OrderService orderService;
-	private final OrderNumberGenerator orderNumberGenerator;
 	private final PaymentConfirmFacade paymentConfirmFacade;
 	private final PaymentService paymentService;
 	private final ProductService productService;
@@ -143,7 +141,7 @@ public class OrderFacade {
 	}
 
 	private String paymentOrderName(Order order) {
-		return orderNumberGenerator.generateName(order.getId());
+		return order.getOrderName();
 	}
 
 	/**

@@ -384,16 +384,13 @@ class OrderFacadeTest {
 				79000L,
 				PaymentStatus.PENDING
 			));
-		when(orderNumberGenerator.generateName(1000L))
-			.thenReturn("order-1000");
-
 		// when
 		OrderCreateResponse response = orderFacade.createOrder(memberId, request);
 
 		// then
 		assertThat(response.orderId()).isEqualTo(1000L);
 		assertThat(response.orderNumber()).isEqualTo("ORD-20260603-000001");
-		assertThat(response.paymentOrderName()).isEqualTo("order-1000");
+		assertThat(response.paymentOrderName()).isEqualTo(savedOrder.getOrderName());
 		assertThat(response.memberId()).isEqualTo(memberId);
 		assertThat(response.totalAmount()).isEqualTo(80000L);
 		assertThat(response.usedPointAmount()).isEqualTo(usedPointAmount);
@@ -429,6 +426,7 @@ class OrderFacadeTest {
 		assertThat(command.totalOrderAmount()).isEqualTo(80000L);
 		assertThat(command.usedPointAmount()).isEqualTo(usedPointAmount);
 		assertThat(command.finalPaymentAmount()).isEqualTo(79000L);
+		assertThat(command.orderName()).isEqualTo(savedOrder.getOrderName());
 
 		verify(memberService).getMember(memberId);
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
@@ -512,9 +510,6 @@ class OrderFacadeTest {
 				PaymentStatus.CONFIRMED,
 				Instant.parse("2026-06-01T01:02:03Z")
 			));
-		when(orderNumberGenerator.generateName(1000L))
-			.thenReturn("order-1000");
-
 		OrderCreateResponse response = orderFacade.createOrder(memberId, request);
 
 		assertThat(response.paymentId()).isEqualTo(paymentId);

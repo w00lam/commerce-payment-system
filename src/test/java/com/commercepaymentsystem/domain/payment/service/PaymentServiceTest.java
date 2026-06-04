@@ -12,7 +12,6 @@ import org.mockito.ArgumentCaptor;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
-import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
@@ -24,18 +23,17 @@ import com.commercepaymentsystem.domain.payment.exception.PaymentException;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
 import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
+import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 
 class PaymentServiceTest {
 
 	private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 	private final PaymentIdGenerator paymentIdGenerator = mock(PaymentIdGenerator.class);
-	private final OrderNumberGenerator orderNumberGenerator = new OrderNumberGenerator();
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
 
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		paymentIdGenerator,
-		orderNumberGenerator,
 		portOneClient
 	);
 
@@ -337,6 +335,22 @@ class PaymentServiceTest {
 			PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED
 		);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+	}
+
+	@Test
+	@DisplayName("Payment confirmation keeps original PortOne exception as cause")
+	void confirmPayment_portOneException_preservesCause() {
+		Payment payment = pendingPayment();
+		PortOneException portOneException = new PortOneException("raw PortOne failure");
+
+		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
+		when(portOneClient.getPayment("payment-123")).thenThrow(portOneException);
+
+		assertThatThrownBy(() -> paymentService.confirmPayment(PaymentConfirmCommand.of("payment-123", 1L)))
+			.isInstanceOf(PaymentException.class)
+			.hasMessage(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED.getMessage())
+			.extracting("errorCode", "cause")
+			.containsExactly(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, portOneException);
 	}
 
 	private Payment pendingPayment() {
