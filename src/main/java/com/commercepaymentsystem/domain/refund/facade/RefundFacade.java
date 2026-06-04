@@ -59,21 +59,28 @@ public class RefundFacade {
 			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
 		}
 
-		return transactionOperations.execute(status -> {
-			Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
-			Refund refund = refundService.completeRefund(preparedRefund.refundId());
-			boolean isFullRefund = refundService.isFullRefund(
-				payment.getUsedPointAmount(),
-				payment.getFinalPaymentAmount(),
-				refundService.getExistingRefunds(payment.getId()),
-				refund
-			);
+		// After PG cancellation succeeds, internal post-processing must leave an auditable state
+		// even when this transaction rolls back.
+		try {
+			return transactionOperations.execute(status -> {
+				Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
+				Refund refund = refundService.completeRefund(preparedRefund.refundId());
+				boolean isFullRefund = refundService.isFullRefund(
+					payment.getUsedPointAmount(),
+					payment.getFinalPaymentAmount(),
+					refundService.getExistingRefunds(payment.getId()),
+					refund
+				);
 
-			refundPostProcessService.process(payment, payment.getOrderId(), refund, isFullRefund);
-			paymentService.updateRefundStatus(payment, isFullRefund);
+				refundPostProcessService.process(payment, payment.getOrderId(), refund, isFullRefund);
+				paymentService.updateRefundStatus(payment, isFullRefund);
 
-			return RefundResult.from(refund, preparedRefund.portOnePaymentId());
-		});
+				return RefundResult.from(refund, preparedRefund.portOnePaymentId());
+			});
+		} catch (RuntimeException exception) {
+			failAfterPgCancel(preparedRefund, exception);
+			throw exception;
+		}
 	}
 
 	private void cancelPgPayment(PreparedRefund preparedRefund) {
@@ -103,6 +110,25 @@ public class RefundFacade {
 		);
 		transactionOperations.execute(status -> {
 			refundService.failRefund(preparedRefund.refundId());
+			return null;
+		});
+	}
+
+	private void failAfterPgCancel(PreparedRefund preparedRefund, RuntimeException exception) {
+		log.error(
+			"Refund post processing failed after PortOne refund. refundId={}, paymentId={}, pgAmount={}",
+			preparedRefund.refundId(),
+			preparedRefund.portOnePaymentId(),
+			preparedRefund.pgAmount(),
+			exception
+		);
+		transactionOperations.execute(status -> {
+			// PG refunds cannot be retried blindly, so keep them separate from ordinary failures.
+			if (preparedRefund.pgAmount() > 0) {
+				refundService.failPostProcess(preparedRefund.refundId());
+			} else {
+				refundService.failRefund(preparedRefund.refundId());
+			}
 			return null;
 		});
 	}

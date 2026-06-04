@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.List;
 import java.util.Optional;
 
@@ -204,8 +205,51 @@ class RefundFacadeTest {
 		verify(refundPostProcessService, never()).process(any(), any(), any(), anyBoolean());
 	}
 
+	@Test
+	@DisplayName("Refund marks post process failure when internal completion fails after PortOne cancel succeeds")
+	void refundPayment_postProcessFailure_afterPortOneSuccess_markPostProcessFailed() {
+		runFirstTransactionAndFailSecondTransaction();
+		Payment payment = confirmedPayment(10_000L, 2_000L, 8_000L);
+		RefundableOrderInfo orderInfo = refundableOrderInfo(10L, 1L, itemInfo(10L, 2L, 5_000L));
+		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
+		when(refundOrderPort.getRefundableOrder(10L, 1L)).thenReturn(orderInfo);
+		when(refundRepository.findByPaymentId(100L)).thenReturn(List.of());
+		stubRefundSaveAndFind(1003L);
+		when(portOneClient.cancelPayment(eq("payment-123"), any(PortOnePaymentCancelRequest.class)))
+			.thenReturn(cancelResponse(4_000L));
+
+		assertThatThrownBy(() -> refundFacade.refundPayment(
+			new RefundCommand(
+				"payment-123",
+				1L,
+				"customer request",
+				List.of(new RefundItemCommand(10L, 1L))
+			)
+		))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("post process failure");
+
+		Refund refund = refundRepository.findById(1003L).orElseThrow();
+		assertThat(refund.getStatus()).isEqualTo(RefundStatus.POST_PROCESS_FAILED);
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		verify(portOneClient).cancelPayment(eq("payment-123"), any(PortOnePaymentCancelRequest.class));
+	}
+
 	private void runTransactionsImmediately() {
 		when(transactionOperations.execute(any())).thenAnswer(invocation -> {
+			TransactionCallback<?> callback = invocation.getArgument(0);
+			return callback.doInTransaction(null);
+		});
+	}
+
+	private void runFirstTransactionAndFailSecondTransaction() {
+		AtomicInteger transactionCount = new AtomicInteger();
+		when(transactionOperations.execute(any())).thenAnswer(invocation -> {
+			int count = transactionCount.incrementAndGet();
+			if (count == 2) {
+				throw new IllegalStateException("post process failure");
+			}
+
 			TransactionCallback<?> callback = invocation.getArgument(0);
 			return callback.doInTransaction(null);
 		});

@@ -8,13 +8,14 @@ public enum RefundStatus {
 	REQUESTED,
 	PROCESSING,
 	COMPLETED,
+	POST_PROCESS_FAILED,
 	FAILED;
 
 	/**
 	 * 더 이상 상태 전이가 필요하지 않은 최종 상태인지 확인합니다.
 	 */
 	public boolean isTerminal() {
-		return this == COMPLETED || this == FAILED;
+		return this == COMPLETED || this == POST_PROCESS_FAILED || this == FAILED;
 	}
 
 	/**
@@ -48,5 +49,14 @@ public enum RefundStatus {
 		}
 
 		return FAILED;
+	}
+
+	public RefundStatus failPostProcess() {
+		// Use this only after PG cancellation succeeds and internal post-processing fails.
+		if (this != PROCESSING) {
+			throw new RefundException(RefundErrorCode.INVALID_REFUND_STATUS);
+		}
+
+		return POST_PROCESS_FAILED;
 	}
 }
