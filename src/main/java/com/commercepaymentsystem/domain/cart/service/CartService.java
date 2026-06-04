@@ -97,6 +97,13 @@ public class CartService {
 		return cartItemRepository.findByIdInAndCartMemberIdWithCart(cartItemIds, memberId);
 	}
 
+	/**
+	 * 결제 완료되어 주문 상품으로 등록된 장바구니 항목들을 일괄 제거합니다.
+	 * 이미 지워진 항목이 존재하더라도 비즈니스 롤백을 막기 위해 경고 로그로 남기고 성공 처리합니다.
+	 *
+	 * @param orderedItemIds 결제 완료된 장바구니 항목 식별자 목록
+	 * @param memberId       회원 식별자
+	 */
 	@Transactional
 	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {
 		int deleted = cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId);

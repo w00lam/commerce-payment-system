@@ -46,13 +46,27 @@ public class OrderService {
 		return orderRepository.save(order);
 	}
 
-	// 내 주문 목록 조회
+	/**
+	 * 특정 회원의 주문 전체 내역 목록을 페이징 처리하여 조회합니다.
+	 *
+	 * @param memberId 회원 식별자
+	 * @param pageable 페이징 및 정렬 정보
+	 * @return 페이징 처리된 주문 정보 목록 GetOrderResponse를 담은 PageResponse 객체
+	 */
 	public PageResponse<GetOrderResponse> getOrders(Long memberId, Pageable pageable) {
 		Page<Order> orders = orderRepository.findByMember_Id(memberId, pageable);
 
 		return PageResponse.from(orders.map(GetOrderResponse::from));
 	}
 
+	/**
+	 * 특정 회원의 주문 단건 상세 내역을 주문 상품 정보와 함께 조회합니다.
+	 * N+1 문제를 방지하기 위해 Fetch Join 쿼리를 수행합니다.
+	 *
+	 * @param orderId  주문 식별자
+	 * @param memberId 회원 식별자
+	 * @return 주문 상품을 포함한 Order 엔티티 객체
+	 */
 	public Order getMyOrderDetail(Long orderId, Long memberId) {
 		return orderRepository.findByIdAndMemberIdWithOrderItems(orderId, memberId).orElseThrow(
 			() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND)
@@ -77,6 +91,13 @@ public class OrderService {
 			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 	}
 
+	/**
+	 * 결제 승인 후처리 단계에서 주문과 주문 상품 정보를 함께 조회하기 위한 메서드입니다.
+	 * 지연 로딩 예외 방지 및 쿼리 최적화를 위해 Fetch Join 쿼리를 사용합니다.
+	 *
+	 * @param orderId 주문 식별자
+	 * @return 주문 상품 정보를 담고 있는 Order 엔티티 객체
+	 */
 	@Transactional(readOnly = true)
 	public Order getOrderByIdWithOrderItems(Long orderId) {
 		return orderRepository.findWithOrderItemsById(orderId)
@@ -89,6 +110,14 @@ public class OrderService {
 		}
 	}
 
+	/**
+	 * 특정 회원의 주문 취소를 처리하기 위해 주문 상세 정보를 비관적 락으로 조회합니다.
+	 * N+1 문제를 방지하기 위해 주문 상품 및 상품 정보를 Fetch Join 쿼리로 함께 락킹합니다.
+	 *
+	 * @param orderId  주문 식별자
+	 * @param memberId 회원 식별자
+	 * @return 비관적 락이 적용된 Order 엔티티 객체
+	 */
 	@Transactional
 	public Order getMyOrderDetailForUpdate(Long orderId, Long memberId) {
 		return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
@@ -96,11 +125,11 @@ public class OrderService {
 	}
 
 	/**
-	 * 환불 처리 시 주문 상품 정보를 바탕으로 상품 식별자를 추출하고 ProductService를 호출하여 비관적 락 기반의 안전한 재고 복구를 수행합니다.
+	 * 환불 및 취소 요청된 주문 상품들의 정보를 바탕으로, 실제 복구해야 할 상품별 복구 수량 맵을 계산하여 반환합니다.
 	 *
 	 * @param order            주문 엔티티 객체
-	 * @param refundQuantities 주문 상품 식별자(ID)와 복구할 환불 수량의 매핑 정보
-	 * @return
+	 * @param refundQuantities 주문 상품 식별자(ID)와 복구 대상 수량의 매핑 정보
+	 * @return 상품 식별자(ID)와 최종 복구할 상품 수량의 매핑 정보 (Map)
 	 */
 	@Transactional
 	public Map<Long, Long> restoreProductStock(Order order, Map<Long, Long> refundQuantities) {

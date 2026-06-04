@@ -139,6 +139,13 @@ public class OrderFacade {
 		);
 	}
 
+	/**
+	 * 회원의 특정 주문에 대한 단건 상세 내역과 결제 정보를 함께 조회합니다.
+	 *
+	 * @param memberId 회원 식별자
+	 * @param orderId  주문 식별자
+	 * @return 주문 상세 정보와 결제 결과를 포함하는 GetOrderDetailResponse 객체
+	 */
 	public GetOrderDetailResponse getOrderDetail(Long memberId, Long orderId) {
 
 		Order order = orderService.getMyOrderDetail(orderId, memberId);
@@ -148,6 +155,13 @@ public class OrderFacade {
 		return GetOrderDetailResponse.of(order, payment);
 	}
 
+	/**
+	 * 결제가 완료되지 않은(PENDING) 주문 및 결제 정보를 비관적 락 기반으로 안전하게 취소 처리하고 상품 재고를 복구합니다.
+	 *
+	 * @param memberId 회원 식별자
+	 * @param orderId  주문 식별자
+	 * @return 취소 처리된 주문 결과를 포함하는 OrderCancelResponse 객체
+	 */
 	@Transactional
 	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
 		Payment payment = paymentService.getPendingPaymentByOrderIdForUpdate(
