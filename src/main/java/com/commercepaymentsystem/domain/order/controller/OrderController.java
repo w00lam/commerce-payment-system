@@ -70,6 +70,7 @@ public class OrderController {
 		return ApiResponse.ok(orderFacade.getOrderDetail(memberId, orderId));
 	}
 
+	// 내 주문 취소
 	@PatchMapping("/{orderId}/cancel")
 	public ApiResponse<OrderCancelResponse> cancelOrder(
 		@AuthenticationPrincipal Long memberId,

@@ -152,7 +152,6 @@ public class OrderFacade {
 	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
 		Order order = orderService.getMyOrderDetailForUpdate(orderId, memberId);
 
-
 		Payment payment = paymentService.getPendingPaymentByOrderIdForUpdate(
 			order.getId(),
 			memberId
@@ -211,6 +210,5 @@ public class OrderFacade {
 
 		return cartItems;
 	}
-
 
 }

@@ -30,11 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class OrderService {
 
 	private final OrderRepository orderRepository;
-
 	private final OrderNumberGenerator orderNumberGenerator;
-	private final ProductService productService;
-
-
 
 	@Transactional
 	public Order createOrder(Member member, List<CartItem> cartItems, List<Product> products, Long usedPointAmount) {
@@ -113,6 +109,5 @@ public class OrderService {
 			}
 			productQuantities.merge(orderItem.getProductId(), refundQuantity.getValue(), Long::sum);
 		}
-		productService.restoreProductStocks(productQuantities);
 	}
 }
