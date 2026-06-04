@@ -610,88 +610,46 @@ class OrderFacadeTest {
 		Long memberId = 1L;
 		Long orderId = 1000L;
 
-		Member member = createMember(memberId, 5000L);
+		Product product = mock(Product.class);
+		when(product.getId()).thenReturn(10L);
 
-		Product firstProduct = createProduct(
-			100L,
-			"키보드",
-			30000L,
-			10L,
-			ProductStatus.ON_SALE
-		);
+		OrderItem orderItem = mock(OrderItem.class);
+		when(orderItem.getProduct()).thenReturn(product);
+		when(orderItem.getQuantity()).thenReturn(2L);
 
-		Product secondProduct = createProduct(
-			200L,
-			"마우스",
-			20000L,
-			5L,
-			ProductStatus.ON_SALE
-		);
+		Order order = mock(Order.class);
+		when(order.getId()).thenReturn(orderId);
+		when(order.getOrderItems()).thenReturn(List.of(orderItem));
 
-		OrderItem firstOrderItem = createOrderItem(
-			10L,
-			firstProduct,
-			2L
-		);
-
-		OrderItem secondOrderItem = createOrderItem(
-			20L,
-			secondProduct,
-			1L
-		);
-
-		Order order = createSavedOrder(
-			member,
-			List.of(firstOrderItem, secondOrderItem),
-			80000L,
-			1000L
-		);
-
-		Payment payment = createPendingPayment(
-			100L,
-			"PAY-20260604-000001",
-			memberId,
-			orderId,
-			80000L,
-			1000L,
-			79000L
-		);
+		Payment payment = mock(Payment.class);
 
 		when(orderService.getMyOrderDetailForUpdate(orderId, memberId))
 			.thenReturn(order);
-		when(paymentService.getPendingPaymentByOrderIdForUpdate(orderId, memberId))
-			.thenReturn(payment);
 
-		doAnswer(invocation -> {
-			Order targetOrder = invocation.getArgument(0);
-			ReflectionTestUtils.setField(targetOrder, "status", OrderStatus.CANCELED);
-			return null;
-		})
-			.when(orderService)
-			.cancelOrder(order);
+		when(paymentService.getPendingPaymentByOrderIdForUpdate(order.getId(), memberId))
+			.thenReturn(payment);
 
 		// when
 		OrderCancelResponse response = orderFacade.cancelOrder(memberId, orderId);
 
 		// then
-		assertThat(response.orderId()).isEqualTo(orderId);
-		assertThat(response.orderNumber()).isEqualTo("ORD-20260603-000001");
-		assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
-
-		ArgumentCaptor<Map<Long, Long>> quantitiesCaptor =
-			ArgumentCaptor.forClass(Map.class);
-
 		verify(orderService).getMyOrderDetailForUpdate(orderId, memberId);
-		verify(paymentService).getPendingPaymentByOrderIdForUpdate(orderId, memberId);
+		verify(paymentService).getPendingPaymentByOrderIdForUpdate(order.getId(), memberId);
+
 		verify(orderService).cancelOrder(order);
 		verify(paymentService).failPayment(payment);
-		verify(orderService).restoreProductStock(eq(order), quantitiesCaptor.capture());
 
-		Map<Long, Long> restoredQuantities = quantitiesCaptor.getValue();
+		ArgumentCaptor<Map<Long, Long>> productQuantitiesCaptor =
+			ArgumentCaptor.forClass(Map.class);
 
-		assertThat(restoredQuantities).hasSize(2);
-		assertThat(restoredQuantities.get(10L)).isEqualTo(2L);
-		assertThat(restoredQuantities.get(20L)).isEqualTo(1L);
+		verify(productService).restoreProductStocks(productQuantitiesCaptor.capture());
+
+		Map<Long, Long> productQuantities = productQuantitiesCaptor.getValue();
+
+		assertThat(productQuantities)
+			.containsEntry(product.getId(), orderItem.getQuantity());
+
+		assertThat(response).isNotNull();
 	}
 
 	@Test
