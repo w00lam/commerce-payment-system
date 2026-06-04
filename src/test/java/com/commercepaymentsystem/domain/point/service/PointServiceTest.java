@@ -323,4 +323,101 @@ class PointServiceTest {
 			.extracting("errorCode")
 			.isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
 	}
+
+	@Test
+	@DisplayName("Earned points are revoked for a refund and history is saved")
+	void revokeEarnedPoint_Success() {
+		Long memberId = 1L;
+		Long amount = 300L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		member.addPoint(500L);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
+			paymentId,
+			PointHistoryType.EARN_REVOKE,
+			refundId
+		)).willReturn(false);
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(true);
+
+		pointService.revokeEarnedPoint(memberId, amount, paymentId, refundId);
+
+		assertThat(member.getPointBalance()).isEqualTo(200L);
+		verify(pointHistoryRepository).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("Earned point revocation is idempotent by refund id")
+	void revokeEarnedPoint_AlreadyRevoked() {
+		Long memberId = 1L;
+		Long amount = 300L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = mock(Member.class);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
+			paymentId,
+			PointHistoryType.EARN_REVOKE,
+			refundId
+		)).willReturn(true);
+
+		pointService.revokeEarnedPoint(memberId, amount, paymentId, refundId);
+
+		verify(member, never()).revokePoint(anyLong());
+		verify(pointHistoryRepository, never()).save(any(PointHistory.class));
+	}
+
+	@Test
+	@DisplayName("Earned point revocation fails without original earn history")
+	void revokeEarnedPoint_NoEarnHistory() {
+		Long memberId = 1L;
+		Long amount = 300L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		member.addPoint(500L);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
+			paymentId,
+			PointHistoryType.EARN_REVOKE,
+			refundId
+		)).willReturn(false);
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(false);
+
+		assertThatThrownBy(() -> pointService.revokeEarnedPoint(memberId, amount, paymentId, refundId))
+			.isInstanceOf(PointException.class)
+			.extracting("errorCode")
+			.isEqualTo(PointErrorCode.SOURCE_HISTORY_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("Earned point revocation deducts only remaining balance when balance is insufficient")
+	void revokeEarnedPoint_InsufficientBalance_revokeRemainingBalance() {
+		Long memberId = 1L;
+		Long amount = 300L;
+		Long paymentId = 100L;
+		Long refundId = 1L;
+		Member member = Member.create("test@test.com", "pw", "name", "01012345678");
+		member.addPoint(120L);
+
+		given(memberRepository.findByIdWithPessimisticLock(memberId)).willReturn(Optional.of(member));
+		given(pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
+			paymentId,
+			PointHistoryType.EARN_REVOKE,
+			refundId
+		)).willReturn(false);
+		given(pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)).willReturn(true);
+
+		pointService.revokeEarnedPoint(memberId, amount, paymentId, refundId);
+
+		assertThat(member.getPointBalance()).isZero();
+		verify(pointHistoryRepository).save(argThat(history ->
+			history.getType() == PointHistoryType.EARN_REVOKE &&
+				history.getAmount().equals(120L)
+		));
+	}
 }

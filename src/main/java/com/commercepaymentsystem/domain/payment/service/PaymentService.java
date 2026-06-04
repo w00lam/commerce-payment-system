@@ -278,4 +278,34 @@ public class PaymentService {
 
 		throw new PaymentException(PaymentErrorCode.PAYMENT_ID_GENERATION_FAILED);
 	}
+
+	@Transactional
+	public Payment loadAndValidatePaymentForRefund(String paymentId, Long memberId) {
+		Payment payment = paymentRepository.findByPaymentIdForUpdate(paymentId)
+			.orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+		if (!Objects.equals(payment.getMemberId(), memberId)) {
+			throw new PaymentException(PaymentErrorCode.PAYMENT_OWNER_MISMATCH);
+		}
+
+		if (!payment.isRefundable()) {
+			throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_STATUS);
+		}
+
+		return payment;
+	}
+
+	public Payment getPaymentById(Long id) {
+		return paymentRepository.findById(id)
+			.orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+	}
+
+	@Transactional
+	public void updateRefundStatus(Payment payment, boolean isFullRefund) {
+		if (isFullRefund) {
+			payment.markRefunded();
+		} else {
+			payment.markPartiallyRefunded();
+		}
+	}
 }

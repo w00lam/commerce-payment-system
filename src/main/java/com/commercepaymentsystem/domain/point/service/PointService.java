@@ -47,6 +47,19 @@ public class PointService {
 	}
 
 	/**
+	 * 특정 결제 건에 대해 이미 회수 처리된 적립 포인트의 합계를 조회합니다.
+	 *
+	 * @param paymentId 결제 식별자 (PK)
+	 * @return 이미 회수 완료된 적립 포인트 총합
+	 */
+	public long getRevokedEarnedPointAmount(Long paymentId) {
+		if (paymentId == null) {
+			throw pointException(PointErrorCode.PAYMENT_ID_REQUIRED);
+		}
+		return pointHistoryRepository.sumAmountByPaymentIdAndType(paymentId, PointHistoryType.EARN_REVOKE);
+	}
+
+	/**
 	 * 포인트 적립
 	 */
 	@Transactional
@@ -104,6 +117,41 @@ public class PointService {
 
 		member.addPoint(amount);
 		savePointHistory(memberId, paymentId, refundId, PointHistoryType.USE_CANCEL, amount);
+	}
+
+	/**
+	 * 환불 처리 시 결제로 인해 적립된 포인트를 회수(취소)합니다.
+	 * 회원의 현재 잔액 내에서 최대한 회수하며, 회수한 금액만큼 포인트 거래 내역을 기록합니다.
+	 *
+	 * @param memberId 회원 식별자 (PK)
+	 * @param amount 회수할 대상 포인트 금액
+	 * @param paymentId 결제 식별자 (PK)
+	 * @param refundId 환불 식별자 (PK)
+	 */
+	@Transactional
+	public void revokeEarnedPoint(Long memberId, Long amount, Long paymentId, Long refundId) {
+		validateRestoreRequest(amount, paymentId, refundId);
+
+		Member member = findMemberByIdWithLock(memberId);
+
+		if (pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
+			paymentId,
+			PointHistoryType.EARN_REVOKE,
+			refundId
+		)) {
+			return;
+		}
+
+		if (!pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
+			throw pointException(PointErrorCode.SOURCE_HISTORY_NOT_FOUND);
+		}
+
+		Long revokedAmount = member.revokePoint(amount);
+		if (revokedAmount <= 0) {
+			return;
+		}
+
+		savePointHistory(memberId, paymentId, refundId, PointHistoryType.EARN_REVOKE, revokedAmount);
 	}
 
 	private void validatePointRequest(Long amount, Long paymentId) {

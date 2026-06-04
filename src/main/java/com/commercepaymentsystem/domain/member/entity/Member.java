@@ -2,7 +2,6 @@ package com.commercepaymentsystem.domain.member.entity;
 
 import java.time.LocalDateTime;
 
-import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
@@ -108,6 +107,22 @@ public class Member extends BaseEntity {
 			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH);
 		}
 		this.pointBalance -= amount;
+	}
+
+	/**
+	 * 환불 처리 시 결제로 인해 적립되었던 포인트를 회수합니다.
+	 * 회원의 현재 포인트 잔액이 회수하려는 포인트보다 부족한 경우, 보유한 포인트 전체만 회수하고 잔액을 0으로 설정합니다.
+	 *
+	 * @param amount 회수할 포인트 금액
+	 * @return 실제로 회수 처리된 포인트 금액 (0 이상)
+	 */
+	public Long revokePoint(Long amount) {
+		validateAmount(amount);
+
+		Long revokedAmount = Math.min(this.pointBalance, amount);
+		this.pointBalance -= revokedAmount;
+
+		return revokedAmount;
 	}
 
 	private void validateAmount(Long amount) {
