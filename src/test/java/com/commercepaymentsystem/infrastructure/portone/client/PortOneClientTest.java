@@ -191,8 +191,23 @@ class PortOneClientTest {
 		))
 			.isInstanceOf(PortOneException.class)
 			.hasMessageContaining("PortOne 결제 취소 실패")
-			.extracting("errorType", "pgCode", "pgMessage")
-			.containsExactly("PgProviderError", "DUPLICATED_CANCEL", "already cancelled");
+			.hasMessageContaining("PG rejected cancel request")
+			.extracting("statusCode", "errorType", "portOneMessage", "pgCode", "pgMessage", "responseBody")
+			.containsExactly(
+				400,
+				"PgProviderError",
+				"PG rejected cancel request",
+				"DUPLICATED_CANCEL",
+				"already cancelled",
+				"""
+				{
+				  "type": "PgProviderError",
+				  "message": "PG rejected cancel request",
+				  "pgCode": "DUPLICATED_CANCEL",
+				  "pgMessage": "already cancelled"
+				}
+				"""
+			);
 		server.verify();
 	}
 
