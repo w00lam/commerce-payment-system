@@ -16,7 +16,7 @@ import com.commercepaymentsystem.domain.webhook.exception.WebhookException;
 
 class PortOneWebhookSignatureVerifierTest {
 
-	private static final String SECRET = "whsec_d2ViaG9va190ZXN0X3NlY3JldA==";
+	private static final String SECRET = System.getenv("PORTONE_WEBHOOK_SECRET");
 
 	private final PortOneWebhookSignatureVerifier verifier = new PortOneWebhookSignatureVerifier(
 		new PortOneWebhookProperties(SECRET)
@@ -63,7 +63,8 @@ class PortOneWebhookSignatureVerifierTest {
 	private String sign(String message) {
 		try {
 			Mac mac = Mac.getInstance("HmacSHA256");
-			mac.init(new SecretKeySpec(Base64.getDecoder().decode("d2ViaG9va190ZXN0X3NlY3JldA=="), "HmacSHA256"));
+			String value = SECRET.startsWith("whsec_") ? SECRET.substring(6) : SECRET;
+			mac.init(new SecretKeySpec(Base64.getDecoder().decode(value), "HmacSHA256"));
 			return Base64.getEncoder().encodeToString(mac.doFinal(message.getBytes(StandardCharsets.UTF_8)));
 		} catch (Exception exception) {
 			throw new IllegalStateException(exception);

@@ -43,4 +43,5 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    environment "PORTONE_WEBHOOK_SECRET", "whsec_d2ViaG9va190ZXN0X3NlY3JldA=="
 }

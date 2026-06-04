@@ -29,4 +29,4 @@ portone:
   connect-timeout: 1s
   read-timeout: 3s
   webhook:
-    secret: "whsec_d2ViaG9va190ZXN0X3NlY3JldA=="
+    secret: ${PORTONE_WEBHOOK_SECRET}
