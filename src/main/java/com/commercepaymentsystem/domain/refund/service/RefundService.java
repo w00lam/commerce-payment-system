@@ -4,14 +4,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.commercepaymentsystem.domain.order.entity.Order;
-import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.refund.dto.RefundCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundItemCommand;
@@ -20,6 +17,8 @@ import com.commercepaymentsystem.domain.refund.entity.RefundItem;
 import com.commercepaymentsystem.domain.refund.entity.RefundStatus;
 import com.commercepaymentsystem.domain.refund.exception.RefundErrorCode;
 import com.commercepaymentsystem.domain.refund.exception.RefundException;
+import com.commercepaymentsystem.domain.refund.port.RefundOrderPort.RefundableOrderInfo;
+import com.commercepaymentsystem.domain.refund.port.RefundOrderPort.RefundableOrderInfo.RefundableOrderItemInfo;
 import com.commercepaymentsystem.domain.refund.repository.RefundRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -47,9 +46,9 @@ public class RefundService {
 	}
 
 	@Transactional
-	public PreparedRefund prepareRefund(RefundCommand command, Payment payment, Order order) {
-		Map<Long, OrderItem> orderItems = order.getOrderItems().stream()
-			.collect(Collectors.toMap(OrderItem::getId, Function.identity()));
+	public PreparedRefund prepareRefund(RefundCommand command, Payment payment, RefundableOrderInfo order) {
+		Map<Long, RefundableOrderItemInfo> orderItems = order.orderItems().stream()
+			.collect(Collectors.toMap(RefundableOrderItemInfo::orderItemId, item -> item));
 		Map<Long, Long> requestedQuantities = mergeRequestedQuantities(command.items());
 		List<Refund> existingRefunds = refundRepository.findByPaymentId(payment.getId());
 		Map<Long, Long> refundedQuantities = refundedQuantities(existingRefunds);
@@ -149,25 +148,25 @@ public class RefundService {
 
 	private List<PreparedRefundItem> prepareItems(
 		Map<Long, Long> requestedQuantities,
-		Map<Long, OrderItem> orderItems,
+		Map<Long, RefundableOrderItemInfo> orderItems,
 		Map<Long, Long> refundedQuantities,
 		Payment payment,
 		RefundAmounts alreadyRefunded
 	) {
 		long requestedTotalAmount = 0;
 		for (Map.Entry<Long, Long> entry : requestedQuantities.entrySet()) {
-			OrderItem orderItem = orderItems.get(entry.getKey());
+			RefundableOrderItemInfo orderItem = orderItems.get(entry.getKey());
 			if (orderItem == null) {
 				throw new RefundException(RefundErrorCode.INVALID_REFUND_ITEM);
 			}
 
 			long alreadyRefundedQuantity = refundedQuantities.getOrDefault(entry.getKey(), 0L);
-			long remainingQuantity = orderItem.getQuantity() - alreadyRefundedQuantity;
+			long remainingQuantity = orderItem.quantity() - alreadyRefundedQuantity;
 			if (entry.getValue() > remainingQuantity) {
 				throw new RefundException(RefundErrorCode.REFUND_AMOUNT_EXCEEDED);
 			}
 
-			requestedTotalAmount += orderItem.getOrderPrice() * entry.getValue();
+			requestedTotalAmount += orderItem.orderPrice() * entry.getValue();
 		}
 
 		RefundAmounts totalAmounts = splitTotalRefundAmount(
@@ -184,8 +183,8 @@ public class RefundService {
 
 		for (int i = 0; i < requestedEntries.size(); i++) {
 			Map.Entry<Long, Long> entry = requestedEntries.get(i);
-			OrderItem orderItem = orderItems.get(entry.getKey());
-			long itemTotalAmount = orderItem.getOrderPrice() * entry.getValue();
+			RefundableOrderItemInfo orderItem = orderItems.get(entry.getKey());
+			long itemTotalAmount = orderItem.orderPrice() * entry.getValue();
 			long itemPointAmount;
 			long itemPgAmount;
 			if (i == requestedEntries.size() - 1) {
@@ -237,13 +236,13 @@ public class RefundService {
 
 	private boolean isLastRefund(
 		Map<Long, Long> requestedQuantities,
-		Map<Long, OrderItem> orderItems,
+		Map<Long, RefundableOrderItemInfo> orderItems,
 		Map<Long, Long> refundedQuantities
 	) {
-		for (OrderItem orderItem : orderItems.values()) {
-			long requestedQuantity = requestedQuantities.getOrDefault(orderItem.getId(), 0L);
-			long alreadyRefundedQuantity = refundedQuantities.getOrDefault(orderItem.getId(), 0L);
-			if (alreadyRefundedQuantity + requestedQuantity < orderItem.getQuantity()) {
+		for (RefundableOrderItemInfo orderItem : orderItems.values()) {
+			long requestedQuantity = requestedQuantities.getOrDefault(orderItem.orderItemId(), 0L);
+			long alreadyRefundedQuantity = refundedQuantities.getOrDefault(orderItem.orderItemId(), 0L);
+			if (alreadyRefundedQuantity + requestedQuantity < orderItem.quantity()) {
 				return false;
 			}
 		}
