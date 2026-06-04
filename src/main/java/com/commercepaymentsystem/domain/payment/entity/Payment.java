@@ -42,6 +42,10 @@ public class Payment extends BaseEntity {
 	private Long orderId;
 
 	@NonNull
+	@Column(name = "order_name", length = 100)
+	private String orderName;
+
+	@NonNull
 	@Column(name = "total_order_amount", nullable = false)
 	private Long totalOrderAmount;
 
@@ -73,6 +77,7 @@ public class Payment extends BaseEntity {
 		String paymentId,
 		Long memberId,
 		Long orderId,
+		String orderName,
 		Long totalOrderAmount,
 		Long usedPointAmount,
 		Long finalPaymentAmount
@@ -81,11 +86,31 @@ public class Payment extends BaseEntity {
 			paymentId,
 			memberId,
 			orderId,
+			orderName,
 			totalOrderAmount,
 			usedPointAmount,
 			finalPaymentAmount,
 			calculateEarnedPointAmount(finalPaymentAmount),
 			PaymentStatus.PENDING
+		);
+	}
+
+	public static Payment create(
+		String paymentId,
+		Long memberId,
+		Long orderId,
+		Long totalOrderAmount,
+		Long usedPointAmount,
+		Long finalPaymentAmount
+	) {
+		return create(
+			paymentId,
+			memberId,
+			orderId,
+			"order-" + orderId,
+			totalOrderAmount,
+			usedPointAmount,
+			finalPaymentAmount
 		);
 	}
 

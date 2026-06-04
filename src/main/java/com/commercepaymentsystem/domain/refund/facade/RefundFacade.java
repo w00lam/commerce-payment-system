@@ -37,11 +37,10 @@ public class RefundFacade {
 	private final TransactionOperations transactionOperations;
 
 	/**
-	 * 환불 요청을 받아서 데이터베이스 상태(재고 복구, 포인트 복원 및 회수, 결제/주문 상태 전이)를 단일 트랜잭션으로 업데이트한 뒤,
-	 * 트랜잭션 외부에서 외부 PG(PortOne)에 취소 요청을 보내 정합성을 보장하는 핵심 환불 퍼사드 로직을 실행합니다.
+	 * 환불 요청을 검증하고 PG 취소와 내부 후처리를 순서대로 실행합니다.
 	 *
-	 * @param command 환불 명령 정보 (결제 식별자, 주문 상품 식별자 및 환불 수량 등)
-	 * @return 환불 처리 결과 정보
+	 * 포트원 취소는 DB 트랜잭션 밖에서 먼저 실행하고, 성공한 뒤 내부 상태를 별도 트랜잭션으로 반영합니다.
+	 * 포인트 전액 결제처럼 PG 취소 금액이 없으면 포트원 호출 없이 내부 후처리만 진행합니다.
 	 */
 	public RefundResult refundPayment(RefundCommand command) {
 		refundService.validateCommand(command);
@@ -56,11 +55,9 @@ public class RefundFacade {
 			cancelPgPayment(preparedRefund);
 		} catch (PortOneException exception) {
 			failRefund(preparedRefund, exception);
-			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
+			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception);
 		}
 
-		// After PG cancellation succeeds, internal post-processing must leave an auditable state
-		// even when this transaction rolls back.
 		try {
 			return transactionOperations.execute(status -> {
 				Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
@@ -102,7 +99,7 @@ public class RefundFacade {
 
 	private void failRefund(PreparedRefund preparedRefund, PortOneException exception) {
 		log.error(
-			"PortOne refund failed. refundId={}, paymentId={}, pgAmount={}",
+			"PortOne 환불 요청 실패. refundId={}, paymentId={}, pgAmount={}",
 			preparedRefund.refundId(),
 			preparedRefund.portOnePaymentId(),
 			preparedRefund.pgAmount(),
@@ -116,14 +113,13 @@ public class RefundFacade {
 
 	private void failAfterPgCancel(PreparedRefund preparedRefund, RuntimeException exception) {
 		log.error(
-			"Refund post processing failed after PortOne refund. refundId={}, paymentId={}, pgAmount={}",
+			"PortOne 환불 후 내부 후처리 실패. refundId={}, paymentId={}, pgAmount={}",
 			preparedRefund.refundId(),
 			preparedRefund.portOnePaymentId(),
 			preparedRefund.pgAmount(),
 			exception
 		);
 		transactionOperations.execute(status -> {
-			// PG refunds cannot be retried blindly, so keep them separate from ordinary failures.
 			if (preparedRefund.pgAmount() > 0) {
 				refundService.failPostProcess(preparedRefund.refundId());
 			} else {
@@ -132,5 +128,4 @@ public class RefundFacade {
 			return null;
 		});
 	}
-
 }

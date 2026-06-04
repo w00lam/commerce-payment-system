@@ -147,6 +147,40 @@ class RefundFacadeTest {
 	}
 
 	@Test
+	@DisplayName("Point-only refund skips PortOne cancel and runs post processing")
+	void refundPayment_pointOnly_success() {
+		runTransactionsImmediately();
+		Payment payment = confirmedPayment(10_000L, 10_000L, 0L);
+		RefundableOrderInfo orderInfo = refundableOrderInfo(10L, 1L, itemInfo(10L, 1L, 10_000L));
+		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
+		when(refundOrderPort.getRefundableOrder(10L, 1L)).thenReturn(orderInfo);
+		when(refundRepository.findByPaymentId(100L)).thenReturn(List.of());
+		stubRefundSaveAndFind(1004L);
+
+		RefundResult result = refundFacade.refundPayment(
+			new RefundCommand(
+				"payment-123",
+				1L,
+				"point refund",
+				List.of(new RefundItemCommand(10L, 1L))
+			)
+		);
+
+		assertThat(result.refundId()).isEqualTo(1004L);
+		assertThat(result.status()).isEqualTo(RefundStatus.COMPLETED);
+		assertThat(result.pointRefundAmount()).isEqualTo(10_000L);
+		assertThat(result.pgRefundAmount()).isZero();
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+		verify(portOneClient, never()).cancelPayment(anyString(), any());
+		verify(refundPostProcessService).process(
+			eq(payment),
+			eq(10L),
+			argThat(refund -> refund.getId().equals(1004L) && refund.getStatus() == RefundStatus.COMPLETED),
+			eq(true)
+		);
+	}
+
+	@Test
 	@DisplayName("Refund rejects quantity greater than remaining refundable quantity")
 	void refundPayment_exceededQuantity_fail() {
 		runTransactionsImmediately();
@@ -183,10 +217,11 @@ class RefundFacadeTest {
 		when(refundOrderPort.getRefundableOrder(10L, 1L)).thenReturn(orderInfo);
 		when(refundRepository.findByPaymentId(100L)).thenReturn(List.of());
 		stubRefundSaveAndFind(1002L);
+		PortOneException portOneException = new PortOneException("cancel failed");
 		when(portOneClient.cancelPayment(eq("payment-123"), any(PortOnePaymentCancelRequest.class)))
-			.thenThrow(new PortOneException("cancel failed"));
+			.thenThrow(portOneException);
 
-		assertRefundException(
+		assertThatThrownBy(
 			() -> refundFacade.refundPayment(
 				new RefundCommand(
 					"payment-123",
@@ -194,9 +229,12 @@ class RefundFacadeTest {
 					"customer request",
 					List.of(new RefundItemCommand(10L, 1L))
 				)
-			),
-			RefundErrorCode.PORTONE_REFUND_FAILED
-		);
+			)
+		)
+			.isInstanceOf(RefundException.class)
+			.hasMessage(RefundErrorCode.PORTONE_REFUND_FAILED.getMessage())
+			.extracting("errorCode", "cause")
+			.containsExactly(RefundErrorCode.PORTONE_REFUND_FAILED, portOneException);
 
 		ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
 		verify(refundRepository).save(refundCaptor.capture());

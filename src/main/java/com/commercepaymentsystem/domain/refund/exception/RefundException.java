@@ -11,4 +11,8 @@ public class RefundException extends BusinessException {
 	public RefundException(RefundErrorCode errorCode, String message) {
 		super(errorCode, message);
 	}
+
+	public RefundException(RefundErrorCode errorCode, Throwable cause) {
+		super(errorCode, cause);
+	}
 }

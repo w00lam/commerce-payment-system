@@ -1,4 +1,4 @@
-package com.commercepaymentsystem.domain.order.service;
+package com.commercepaymentsystem.domain.order.facade;
 
 import java.util.List;
 import java.util.Map;
@@ -23,9 +23,14 @@ import com.commercepaymentsystem.domain.order.dto.OrderPreviewResponse;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
+import com.commercepaymentsystem.domain.order.service.OrderService;
+import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
+import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
+import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
+import com.commercepaymentsystem.domain.payment.facade.PaymentConfirmFacade;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductStatus;
@@ -43,21 +48,17 @@ public class OrderFacade {
 	private final CartService cartService;
 	private final MemberService memberService;
 	private final OrderService orderService;
+	private final PaymentConfirmFacade paymentConfirmFacade;
 	private final PaymentService paymentService;
 	private final ProductService productService;
 
 	public OrderPreviewResponse previewOrder(Long memberId, OrderPreviewRequest request) {
-
 		List<Long> cartItemIds = request.cartItemIds();
-
-		// 주문서 미리보기: 재고 차감/주문 생성 없는 읽기 전용
-		// cartItemIds가 null/비어있으면 "전체 장바구니", 값이 있으면 "선택된 아이템만" 주문서에 담는다.
 		List<CartItem> cartItems = getPreviewCartItems(
 			memberId,
 			cartItemIds != null ? cartItemIds : List.of()
 		);
 
-		// 만약 장바구니가 비어있다면 주문서 미리보기에서는 빈 응답을 보냅니다
 		if (cartItems.isEmpty()) {
 			return new OrderPreviewResponse(
 				memberId,
@@ -66,12 +67,9 @@ public class OrderFacade {
 			);
 		}
 
-		// 장바구니 아이템에서 상품 가격과 장바구니 수량을 곱해서 각 아이템의 총액을 구한다.
-		// CartItem을 OrderPreviewResponse.CheckoutItemResponse로 변환
 		List<OrderPreviewResponse.CheckoutItemResponse> items = cartItems.stream()
 			.map(cartItem -> {
-				Long productId = cartItem.getProductId();
-				Product product = productService.getProduct(productId);
+				Product product = productService.getProduct(cartItem.getProductId());
 				if (product.getStatus() != ProductStatus.ON_SALE) {
 					throw new BusinessException(ProductErrorCode.PRODUCT_NOT_ON_SALE);
 				}
@@ -88,7 +86,6 @@ public class OrderFacade {
 			})
 			.toList();
 
-		// 장바구니 주문 총액을 구한다. OrderPreviewResponse.CheckoutItemResponse의 subtotal을 모두 더한다.
 		long totalPrice = items.stream()
 			.mapToLong(OrderPreviewResponse.CheckoutItemResponse::subtotal)
 			.sum();
@@ -100,27 +97,19 @@ public class OrderFacade {
 	public OrderCreateResponse createOrder(Long memberId, OrderCreateRequest request) {
 		List<Long> cartItemIds = (request != null) ? request.cartItemIds() : List.of();
 
-		// 0. 회원 조회
 		Member member = memberService.getMember(memberId);
 		long usedPointAmount = request.safeUsedPointAmount();
 		if (member.getPointBalance() < usedPointAmount) {
-			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다");
+			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다.");
 		}
 
-		// 1. 장바구니 조회 (선택된 아이템만)
 		List<CartItem> cartItems = getValidateCartItems(memberId, cartItemIds);
-
-		// 2. 상품 리스트 생성
 		List<Product> lockedProducts = productService.deductProductStocks(cartItems);
-
-		// 3. 주문 저장
 		Order order = orderService.createOrder(member, cartItems, lockedProducts, usedPointAmount);
 
-		// 4. 결제 정보 생성
-		PaymentCreateCommand command = PaymentCreateCommand.from(order);
-		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(command);
+		PaymentCreateResult paymentCreateResult = paymentService.createPendingPayment(PaymentCreateCommand.from(order));
+		PaymentStatus paymentStatus = confirmPointOnlyPaymentIfNeeded(paymentCreateResult, memberId);
 
-		// 5. 응답 반환
 		List<OrderItemCreateResponse> items = order.getOrderItems().stream()
 			.map(OrderItemCreateResponse::from)
 			.toList();
@@ -128,26 +117,37 @@ public class OrderFacade {
 		return new OrderCreateResponse(
 			order.getId(),
 			order.getOrderNumber(),
+			paymentOrderName(order),
 			order.getMemberId(),
 			order.getTotalPrice(),
 			order.getUsedPointAmount(),
 			paymentCreateResult.finalPaymentAmount(),
 			order.getStatus(),
 			paymentCreateResult.paymentId(),
-			paymentCreateResult.status(),
+			paymentStatus,
 			items
 		);
 	}
 
+	private PaymentStatus confirmPointOnlyPaymentIfNeeded(PaymentCreateResult paymentCreateResult, Long memberId) {
+		if (paymentCreateResult.finalPaymentAmount() > 0) {
+			return paymentCreateResult.status();
+		}
+
+		PaymentConfirmResult confirmResult = paymentConfirmFacade.confirm(
+			PaymentConfirmCommand.of(paymentCreateResult.paymentId(), memberId)
+		);
+		return confirmResult.status();
+	}
+
+	private String paymentOrderName(Order order) {
+		return order.getOrderName();
+	}
+
 	/**
-	 * 회원의 특정 주문에 대한 단건 상세 내역과 결제 정보를 함께 조회합니다.
-	 *
-	 * @param memberId 회원 식별자
-	 * @param orderId  주문 식별자
-	 * @return 주문 상세 정보와 결제 결과를 포함하는 GetOrderDetailResponse 객체
+	 * 회원의 주문 상세 내역과 결제 정보를 함께 조회합니다.
 	 */
 	public GetOrderDetailResponse getOrderDetail(Long memberId, Long orderId) {
-
 		Order order = orderService.getMyOrderDetail(orderId, memberId);
 		PaymentCreateResult payment = paymentService.findPaymentByOrderId(order.getId())
 			.orElse(null);
@@ -156,11 +156,7 @@ public class OrderFacade {
 	}
 
 	/**
-	 * 결제가 완료되지 않은(PENDING) 주문 및 결제 정보를 비관적 락 기반으로 안전하게 취소 처리하고 상품 재고를 복구합니다.
-	 *
-	 * @param memberId 회원 식별자
-	 * @param orderId  주문 식별자
-	 * @return 취소 처리된 주문 결과를 포함하는 OrderCancelResponse 객체
+	 * 아직 결제가 완료되지 않은 주문을 취소하고 차감된 재고를 복구합니다.
 	 */
 	@Transactional
 	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
@@ -210,7 +206,6 @@ public class OrderFacade {
 			.distinct()
 			.toList();
 
-		// distinctCartItemIds 비어있으면 "전체 장바구니", 아니면 "선택된 아이템만" 조회
 		List<CartItem> cartItems = distinctCartItemIds.isEmpty()
 			? cartService.findCartEntities(memberId)
 			: cartService.findCartEntitiesByIds(memberId, distinctCartItemIds);

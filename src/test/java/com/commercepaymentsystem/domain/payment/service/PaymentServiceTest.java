@@ -23,6 +23,7 @@ import com.commercepaymentsystem.domain.payment.exception.PaymentException;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
 import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
+import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 
 class PaymentServiceTest {
 
@@ -281,6 +282,23 @@ class PaymentServiceTest {
 	}
 
 	@Test
+	@DisplayName("Point-only payment confirmation succeeds without PortOne verification")
+	void confirmPayment_pointOnly_success() {
+		Payment payment = pointOnlyPayment();
+
+		when(paymentRepository.findByPaymentIdForUpdate("point-payment-123")).thenReturn(Optional.of(payment));
+
+		Payment result = paymentService.confirmPayment(
+			PaymentConfirmCommand.of("point-payment-123", 1L)
+		);
+
+		assertThat(result.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		assertThat(result.getPaidAt()).isNotNull();
+		assertThat(result.getEarnedPointAmount()).isZero();
+		verify(portOneClient, never()).getPayment(anyString());
+	}
+
+	@Test
 	@DisplayName("Payment confirmation rejects owner mismatch")
 	void confirmPayment_ownerMismatch_fail() {
 		// given
@@ -319,6 +337,22 @@ class PaymentServiceTest {
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
 	}
 
+	@Test
+	@DisplayName("Payment confirmation keeps original PortOne exception as cause")
+	void confirmPayment_portOneException_preservesCause() {
+		Payment payment = pendingPayment();
+		PortOneException portOneException = new PortOneException("raw PortOne failure");
+
+		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
+		when(portOneClient.getPayment("payment-123")).thenThrow(portOneException);
+
+		assertThatThrownBy(() -> paymentService.confirmPayment(PaymentConfirmCommand.of("payment-123", 1L)))
+			.isInstanceOf(PaymentException.class)
+			.hasMessage(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED.getMessage())
+			.extracting("errorCode", "cause")
+			.containsExactly(PaymentErrorCode.PORTONE_PAYMENT_VERIFICATION_FAILED, portOneException);
+	}
+
 	private Payment pendingPayment() {
 		return Payment.create(
 			"payment-123",
@@ -327,6 +361,17 @@ class PaymentServiceTest {
 			10_000L,
 			2_000L,
 			8_000L
+		);
+	}
+
+	private Payment pointOnlyPayment() {
+		return Payment.create(
+			"point-payment-123",
+			1L,
+			10L,
+			10_000L,
+			10_000L,
+			0L
 		);
 	}
 

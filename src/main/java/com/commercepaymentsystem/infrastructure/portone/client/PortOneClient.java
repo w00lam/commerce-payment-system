@@ -31,7 +31,10 @@ public class PortOneClient {
 	public PortOnePaymentResponse getPayment(String paymentId) {
 		try {
 			PortOnePaymentResponse response = restClient.get()
-				.uri("/payments/{paymentId}", paymentId)
+				.uri(uriBuilder -> uriBuilder
+					.path("/payments/{paymentId}")
+					.queryParam("storeId", properties.storeId())
+					.build(paymentId))
 				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
 				.retrieve()
 				.body(PortOnePaymentResponse.class);
@@ -80,13 +83,9 @@ public class PortOneClient {
 	/**
 	 * PortOne V2 결제 취소 API를 호출합니다.
 	 *
-	 * <p>전체 환불과 부분 환불은 모두 같은 PortOne 취소 API를 사용하며, 환불 서비스가 계산한 PG 취소 금액을
-	 * {@link PortOnePaymentCancelRequest#amount()}로 전달합니다. PortOne의 취소 가능 잔액 검증을 위해
-	 * 결제 잔여 금액도 요청 바디에 함께 전달합니다.
-	 *
-	 * @param paymentId PortOne 결제 식별자
-	 * @param request 결제 취소 요청 정보
-	 * @return PortOne 결제 취소 응답
+	 * 전액 환불과 부분 환불은 같은 취소 API를 사용합니다.
+	 * 환불 서비스가 계산한 PG 취소 금액을 amount로 전달하고,
+	 * 취소 가능 잔액 검증을 위해 currentCancellableAmount도 함께 전달합니다.
 	 */
 	public PortOnePaymentCancelResponse cancelPayment(String paymentId, PortOnePaymentCancelRequest request) {
 		try {
