@@ -152,6 +152,7 @@ public class OrderFacade {
 	public OrderCancelResponse cancelOrder(Long memberId, Long orderId) {
 		Order order = orderService.getMyOrderDetailForUpdate(orderId, memberId);
 
+
 		Payment payment = paymentService.getPendingPaymentByOrderIdForUpdate(
 			order.getId(),
 			memberId
@@ -167,8 +168,7 @@ public class OrderFacade {
 				Long::sum
 			));
 
-		orderService.restoreProductStock(order, orderItemQuantities);
-
+		productService.restoreProductStocks(orderItemQuantities);
 		return OrderCancelResponse.from(order);
 	}
 

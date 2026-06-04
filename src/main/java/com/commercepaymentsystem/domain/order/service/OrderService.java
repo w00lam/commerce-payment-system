@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class OrderService {
 
 	private final OrderRepository orderRepository;
+
 	private final OrderNumberGenerator orderNumberGenerator;
 	private final ProductService productService;
 
@@ -89,15 +90,16 @@ public class OrderService {
 
 	@Transactional
 	public Order getMyOrderDetailForUpdate(Long orderId, Long memberId) {
-		return orderRepository.findByIdAndMemberIdWithOrderItemsForUpdate(orderId, memberId)
+		return orderRepository.findByIdAndMemberIdForUpdate(orderId, memberId)
 			.orElseThrow(() -> new BusinessException(OrderErrorCode.ORDER_NOT_FOUND));
 	}
 
 	/**
 	 * 환불 처리 시 주문 상품 정보를 바탕으로 상품 식별자를 추출하고 ProductService를 호출하여 비관적 락 기반의 안전한 재고 복구를 수행합니다.
 	 *
-	 * @param order 주문 엔티티 객체
+	 * @param order            주문 엔티티 객체
 	 * @param refundQuantities 주문 상품 식별자(ID)와 복구할 환불 수량의 매핑 정보
+	 * @return
 	 */
 	@Transactional
 	public void restoreProductStock(Order order, Map<Long, Long> refundQuantities) {
