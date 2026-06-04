@@ -21,6 +21,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
+import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.refund.dto.RefundCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundItemCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundResult;
@@ -53,6 +54,7 @@ class RefundFacadeTest {
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		null,
+		new OrderNumberGenerator(),
 		portOneClient
 	);
 
@@ -142,6 +144,40 @@ class RefundFacadeTest {
 			eq(payment),
 			eq(10L),
 			argThat(refund -> refund.getId().equals(1001L) && refund.getStatus() == RefundStatus.COMPLETED),
+			eq(true)
+		);
+	}
+
+	@Test
+	@DisplayName("Point-only refund skips PortOne cancel and runs post processing")
+	void refundPayment_pointOnly_success() {
+		runTransactionsImmediately();
+		Payment payment = confirmedPayment(10_000L, 10_000L, 0L);
+		RefundableOrderInfo orderInfo = refundableOrderInfo(10L, 1L, itemInfo(10L, 1L, 10_000L));
+		when(paymentRepository.findByPaymentIdForUpdate("payment-123")).thenReturn(Optional.of(payment));
+		when(refundOrderPort.getRefundableOrder(10L, 1L)).thenReturn(orderInfo);
+		when(refundRepository.findByPaymentId(100L)).thenReturn(List.of());
+		stubRefundSaveAndFind(1004L);
+
+		RefundResult result = refundFacade.refundPayment(
+			new RefundCommand(
+				"payment-123",
+				1L,
+				"point refund",
+				List.of(new RefundItemCommand(10L, 1L))
+			)
+		);
+
+		assertThat(result.refundId()).isEqualTo(1004L);
+		assertThat(result.status()).isEqualTo(RefundStatus.COMPLETED);
+		assertThat(result.pointRefundAmount()).isEqualTo(10_000L);
+		assertThat(result.pgRefundAmount()).isZero();
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+		verify(portOneClient, never()).cancelPayment(anyString(), any());
+		verify(refundPostProcessService).process(
+			eq(payment),
+			eq(10L),
+			argThat(refund -> refund.getId().equals(1004L) && refund.getStatus() == RefundStatus.COMPLETED),
 			eq(true)
 		);
 	}

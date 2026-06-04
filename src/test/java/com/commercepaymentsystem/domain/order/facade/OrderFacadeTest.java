@@ -9,6 +9,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,14 +38,17 @@ import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderItem;
 import com.commercepaymentsystem.domain.order.entity.OrderStatus;
 import com.commercepaymentsystem.domain.order.exception.OrderErrorCode;
-import com.commercepaymentsystem.domain.order.service.OrderFacade;
+import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
+import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
+import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
 import com.commercepaymentsystem.domain.payment.exception.PaymentException;
+import com.commercepaymentsystem.domain.payment.facade.PaymentConfirmFacade;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.product.entity.Product;
 import com.commercepaymentsystem.domain.product.entity.ProductCategory;
@@ -64,6 +68,12 @@ class OrderFacadeTest {
 
 	@Mock
 	private OrderService orderService;
+
+	@Mock
+	private OrderNumberGenerator orderNumberGenerator;
+
+	@Mock
+	private PaymentConfirmFacade paymentConfirmFacade;
 
 	@Mock
 	private PaymentService paymentService;
@@ -374,6 +384,8 @@ class OrderFacadeTest {
 				79000L,
 				PaymentStatus.PENDING
 			));
+		when(orderNumberGenerator.generateName(1000L))
+			.thenReturn("order-1000");
 
 		// when
 		OrderCreateResponse response = orderFacade.createOrder(memberId, request);
@@ -381,6 +393,7 @@ class OrderFacadeTest {
 		// then
 		assertThat(response.orderId()).isEqualTo(1000L);
 		assertThat(response.orderNumber()).isEqualTo("ORD-20260603-000001");
+		assertThat(response.paymentOrderName()).isEqualTo("order-1000");
 		assertThat(response.memberId()).isEqualTo(memberId);
 		assertThat(response.totalAmount()).isEqualTo(80000L);
 		assertThat(response.usedPointAmount()).isEqualTo(usedPointAmount);
@@ -430,6 +443,84 @@ class OrderFacadeTest {
 		verify(productService, never()).getProduct(firstProductId);
 		verify(productService, never()).getProduct(secondProductId);
 		verify(cartService, never()).clearCartItems(anyList(), any());
+		verify(paymentConfirmFacade, never()).confirm(any());
+	}
+
+	@Test
+	@DisplayName("Point-only order creation confirms payment automatically")
+	void createOrder_PointOnlyPayment_AutoConfirm() {
+		Long memberId = 1L;
+		Long productId = 100L;
+		Long usedPointAmount = 30000L;
+		String paymentId = "PAY-point-only";
+
+		OrderCreateRequest request = new OrderCreateRequest(
+			List.of(1L),
+			usedPointAmount
+		);
+
+		Member member = createMember(memberId, 30000L);
+		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
+		Product product = createProduct(
+			productId,
+			"Keyboard",
+			30000L,
+			10L,
+			ProductStatus.ON_SALE
+		);
+		OrderItem orderItem = new OrderItem(
+			product,
+			product.getPrice(),
+			cartItem.getQuantity()
+		);
+		Order savedOrder = createSavedOrder(
+			member,
+			List.of(orderItem),
+			30000L,
+			usedPointAmount
+		);
+
+		when(memberService.getMember(memberId))
+			.thenReturn(member);
+		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
+			.thenReturn(List.of(cartItem));
+		when(productService.deductProductStocks(List.of(cartItem)))
+			.thenReturn(List.of(product));
+		when(orderService.createOrder(
+			eq(member),
+			eq(List.of(cartItem)),
+			eq(List.of(product)),
+			eq(usedPointAmount)
+		))
+			.thenReturn(savedOrder);
+		when(paymentService.createPendingPayment(any(PaymentCreateCommand.class)))
+			.thenReturn(new PaymentCreateResult(
+				paymentId,
+				memberId,
+				1000L,
+				30000L,
+				usedPointAmount,
+				0L,
+				PaymentStatus.PENDING
+			));
+		when(paymentConfirmFacade.confirm(PaymentConfirmCommand.of(paymentId, memberId)))
+			.thenReturn(new PaymentConfirmResult(
+				paymentId,
+				memberId,
+				1000L,
+				0L,
+				PaymentStatus.CONFIRMED,
+				Instant.parse("2026-06-01T01:02:03Z")
+			));
+		when(orderNumberGenerator.generateName(1000L))
+			.thenReturn("order-1000");
+
+		OrderCreateResponse response = orderFacade.createOrder(memberId, request);
+
+		assertThat(response.paymentId()).isEqualTo(paymentId);
+		assertThat(response.finalPaymentAmount()).isZero();
+		assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		verify(paymentConfirmFacade).confirm(PaymentConfirmCommand.of(paymentId, memberId));
 	}
 
 	@Test
@@ -539,7 +630,7 @@ class OrderFacadeTest {
 		// when & then
 		assertThatThrownBy(() -> orderFacade.createOrder(memberId, request))
 			.isInstanceOf(BusinessException.class)
-			.hasMessage("포인트 잔액이 부족합니다");
+			.hasMessage("포인트 잔액이 부족합니다.");
 
 		verify(memberService).getMember(memberId);
 		verify(cartService, never()).findCartEntities(any());

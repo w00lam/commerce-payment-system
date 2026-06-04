@@ -17,6 +17,7 @@ import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
+import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.payment.service.PaymentIdGenerator;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
@@ -29,6 +30,9 @@ class OrderReadTest {
 
 	@Mock
 	private PaymentIdGenerator paymentIdGenerator;
+
+	@Mock
+	private OrderNumberGenerator orderNumberGenerator;
 
 	@Mock
 	private PortOneClient portOneClient;

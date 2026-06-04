@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
+import com.commercepaymentsystem.domain.order.service.OrderNumberGenerator;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmCommand;
 import com.commercepaymentsystem.domain.payment.dto.PaymentConfirmResult;
 import com.commercepaymentsystem.domain.payment.dto.PaymentCreateCommand;
@@ -28,11 +29,13 @@ class PaymentServiceTest {
 
 	private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 	private final PaymentIdGenerator paymentIdGenerator = mock(PaymentIdGenerator.class);
+	private final OrderNumberGenerator orderNumberGenerator = new OrderNumberGenerator();
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
 
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		paymentIdGenerator,
+		orderNumberGenerator,
 		portOneClient
 	);
 
@@ -281,6 +284,23 @@ class PaymentServiceTest {
 	}
 
 	@Test
+	@DisplayName("Point-only payment confirmation succeeds without PortOne verification")
+	void confirmPayment_pointOnly_success() {
+		Payment payment = pointOnlyPayment();
+
+		when(paymentRepository.findByPaymentIdForUpdate("point-payment-123")).thenReturn(Optional.of(payment));
+
+		Payment result = paymentService.confirmPayment(
+			PaymentConfirmCommand.of("point-payment-123", 1L)
+		);
+
+		assertThat(result.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		assertThat(result.getPaidAt()).isNotNull();
+		assertThat(result.getEarnedPointAmount()).isZero();
+		verify(portOneClient, never()).getPayment(anyString());
+	}
+
+	@Test
 	@DisplayName("Payment confirmation rejects owner mismatch")
 	void confirmPayment_ownerMismatch_fail() {
 		// given
@@ -327,6 +347,17 @@ class PaymentServiceTest {
 			10_000L,
 			2_000L,
 			8_000L
+		);
+	}
+
+	private Payment pointOnlyPayment() {
+		return Payment.create(
+			"point-payment-123",
+			1L,
+			10L,
+			10_000L,
+			10_000L,
+			0L
 		);
 	}
 
