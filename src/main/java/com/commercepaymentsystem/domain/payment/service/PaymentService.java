@@ -34,7 +34,6 @@ public class PaymentService {
 	private final PaymentRepository paymentRepository;
 	private final PaymentIdGenerator paymentIdGenerator;
 	private final PortOneClient portOneClient;
-	private final PaymentPostProcessService paymentPostProcessService;
 
 	/**
 	 * 주문 생성 흐름에서 전달받은 결제 정보를 검증하고 결제 대기 상태의 Payment를 생성합니다.
@@ -77,14 +76,14 @@ public class PaymentService {
 	 * @throws PaymentException 결제가 없거나 소유권, 상태, PortOne 검증이 실패한 경우
 	 */
 	@Transactional
-	public PaymentConfirmResult confirmPayment(PaymentConfirmCommand command) {
+	public Payment confirmPayment(PaymentConfirmCommand command) {
 		validateConfirmCommand(command);
 
 		Payment payment = loadPaymentForConfirm(command.paymentId());
 		validateOwner(payment, command.memberId());
 
 		if (payment.isConfirmed()) {
-			return PaymentConfirmResult.from(payment);
+			return payment;
 		}
 
 		validateConfirmableStatus(payment);
@@ -93,9 +92,8 @@ public class PaymentService {
 		validatePortOnePayment(payment, portOnePayment);
 
 		payment.confirm(resolvePaidAt(portOnePayment));
-		paymentPostProcessService.process(payment);
 
-		return PaymentConfirmResult.from(payment);
+		return payment;
 	}
 
 	/**

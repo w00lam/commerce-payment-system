@@ -63,8 +63,7 @@ class RefundFacadeTest {
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		null,
-		null,
-		paymentPostProcessService
+		portOneClient
 	);
 
 	private final OrderService orderService = new OrderService(

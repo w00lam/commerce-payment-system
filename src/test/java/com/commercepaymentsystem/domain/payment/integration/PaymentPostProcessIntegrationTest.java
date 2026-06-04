@@ -30,6 +30,7 @@ import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
+import com.commercepaymentsystem.domain.payment.service.PaymentConfirmFacade;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
@@ -49,6 +50,9 @@ class PaymentPostProcessIntegrationTest {
 
 	@Autowired
 	private PaymentService paymentService;
+
+	@Autowired
+	private PaymentConfirmFacade paymentConfirmFacade;
 
 	@Autowired
 	private OrderService orderService;
@@ -110,7 +114,7 @@ class PaymentPostProcessIntegrationTest {
 				paidAt
 			));
 
-		paymentService.confirmPayment(new PaymentConfirmCommand(paymentCreateResult.paymentId(), member.getId()));
+		paymentConfirmFacade.confirm(PaymentConfirmCommand.of(paymentCreateResult.paymentId(), member.getId()));
 
 		entityManager.flush();
 		entityManager.clear();
