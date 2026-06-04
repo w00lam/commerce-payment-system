@@ -185,8 +185,8 @@ class RefundFacadeTest {
 	}
 
 	@Test
-	@DisplayName("Refund keeps committed DB state and reports failure when PortOne cancel fails after DB commit")
-	void refundPayment_portOneFailure_dbCommitted() {
+	@DisplayName("Refund updates status to FAILED and does not restore stock/points when PortOne cancel fails")
+	void refundPayment_portOneFailure_refundFailed() {
 		runTransactionsImmediately();
 		Payment payment = confirmedPayment(10_000L, 2_000L, 8_000L);
 		Order order = confirmedOrder(1L, orderItem(10L, 5_000L, 2L, 0L));
@@ -211,8 +211,10 @@ class RefundFacadeTest {
 
 		ArgumentCaptor<Refund> refundCaptor = ArgumentCaptor.forClass(Refund.class);
 		verify(refundRepository).save(refundCaptor.capture());
-		assertThat(refundCaptor.getValue().getStatus()).isEqualTo(RefundStatus.COMPLETED);
-		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PARTIAL_REFUNDED);
+		assertThat(refundCaptor.getValue().getStatus()).isEqualTo(RefundStatus.FAILED);
+		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+		verify(productService, never()).restoreProductStocks(any());
+		verify(pointService, never()).restorePoint(anyLong(), anyLong(), anyLong(), anyLong());
 	}
 
 	private void runTransactionsImmediately() {

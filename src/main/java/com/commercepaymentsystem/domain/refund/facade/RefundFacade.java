@@ -53,11 +53,24 @@ public class RefundFacade {
 	public RefundResult refundPayment(RefundCommand command) {
 		refundService.validateCommand(command);
 
-		CompletedRefund completedRefund = transactionOperations.execute(status -> {
+		PreparedRefund preparedRefund = transactionOperations.execute(status -> {
 			Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
 			Order order = orderService.getOrderById(payment.getOrderId());
 			orderService.validateOwner(order, command.memberId());
-			PreparedRefund preparedRefund = refundService.prepareRefund(command, payment, order);
+			return refundService.prepareRefund(command, payment, order);
+		});
+
+		try {
+			cancelPgPayment(preparedRefund);
+		} catch (PortOneException exception) {
+			failRefund(preparedRefund, exception);
+			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
+		}
+
+		return transactionOperations.execute(status -> {
+			Payment payment = paymentService.loadAndValidatePaymentForRefund(command.paymentId(), command.memberId());
+			Order order = orderService.getOrderById(payment.getOrderId());
+			orderService.validateOwner(order, command.memberId());
 			Refund refund = refundService.completeRefund(preparedRefund.refundId());
 			List<Refund> existingRefunds = refundService.getExistingRefunds(payment.getId());
 			boolean isFullRefund = refundService.isFullRefund(
@@ -73,26 +86,8 @@ public class RefundFacade {
 			revokeEarnedPoint(payment, refund, isFullRefund);
 			updatePaymentAndOrderStatus(payment, order, isFullRefund);
 
-			return new CompletedRefund(
-				preparedRefund,
-				RefundResult.from(refund, preparedRefund.portOnePaymentId())
-			);
+			return RefundResult.from(refund, preparedRefund.portOnePaymentId());
 		});
-
-		try {
-			cancelPgPayment(completedRefund.preparedRefund());
-		} catch (PortOneException exception) {
-			log.error(
-				"PortOne refund failed. refundId={}, paymentId={}, pgAmount={}",
-				completedRefund.preparedRefund().refundId(),
-				completedRefund.preparedRefund().portOnePaymentId(),
-				completedRefund.preparedRefund().pgAmount(),
-				exception
-			);
-			throw new RefundException(RefundErrorCode.PORTONE_REFUND_FAILED, exception.getMessage());
-		}
-
-		return completedRefund.result();
 	}
 
 	private void cancelPgPayment(PreparedRefund preparedRefund) {
@@ -110,6 +105,20 @@ public class RefundFacade {
 				CANCEL_REQUESTER
 			)
 		);
+	}
+
+	private void failRefund(PreparedRefund preparedRefund, PortOneException exception) {
+		log.error(
+			"PortOne refund failed. refundId={}, paymentId={}, pgAmount={}",
+			preparedRefund.refundId(),
+			preparedRefund.portOnePaymentId(),
+			preparedRefund.pgAmount(),
+			exception
+		);
+		transactionOperations.execute(status -> {
+			refundService.failRefund(preparedRefund.refundId());
+			return null;
+		});
 	}
 
 	private void restorePoint(Payment payment, Refund refund) {
@@ -167,9 +176,5 @@ public class RefundFacade {
 			));
 	}
 
-	private record CompletedRefund(
-		PreparedRefund preparedRefund,
-		RefundResult result
-	) {
-	}
+
 }
