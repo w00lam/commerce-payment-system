@@ -159,4 +159,17 @@ class CartServiceTest {
 		// then
 		assertThat(cartId).isNull();
 	}
+
+	@Test
+	@DisplayName("주문된 장바구니 항목 정리는 일부 항목이 없어도 예외를 던지지 않는다")
+	void clearCartItems_partiallyDeleted_doesNotThrow() {
+		List<Long> orderedItemIds = List.of(1000L, 1001L);
+		Long memberId = 1L;
+
+		when(cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId)).thenReturn(1);
+
+		cartService.clearCartItems(orderedItemIds, memberId);
+
+		verify(cartItemRepository).deleteAllByIdInAndMemberId(orderedItemIds, memberId);
+	}
 }

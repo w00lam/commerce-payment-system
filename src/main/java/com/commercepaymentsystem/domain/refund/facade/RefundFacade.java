@@ -12,6 +12,7 @@ import com.commercepaymentsystem.domain.order.service.OrderService;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
 import com.commercepaymentsystem.domain.point.service.PointService;
+import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.domain.refund.dto.RefundCommand;
 import com.commercepaymentsystem.domain.refund.dto.RefundResult;
 import com.commercepaymentsystem.domain.refund.entity.Refund;
@@ -38,6 +39,7 @@ public class RefundFacade {
 	private final PaymentService paymentService;
 	private final OrderService orderService;
 	private final PointService pointService;
+	private final ProductService productService;
 	private final PortOneClient portOneClient;
 	private final TransactionOperations transactionOperations;
 
@@ -65,7 +67,8 @@ public class RefundFacade {
 				refund
 			);
 
-			orderService.restoreProductStock(order, refundQuantities(refund));
+			Map<Long, Long> productQuantities = orderService.restoreProductStock(order, refundQuantities(refund));
+			productService.restoreProductStocks(productQuantities);
 			restorePoint(payment, refund);
 			revokeEarnedPoint(payment, refund, isFullRefund);
 			updatePaymentAndOrderStatus(payment, order, isFullRefund);

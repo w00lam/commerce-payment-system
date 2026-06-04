@@ -14,7 +14,9 @@ import com.commercepaymentsystem.domain.cart.repository.CartRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -95,10 +97,16 @@ public class CartService {
 		return cartItemRepository.findByIdInAndCartMemberIdWithCart(cartItemIds, memberId);
 	}
 
+	@Transactional
 	public void clearCartItems(List<Long> orderedItemIds, Long memberId) {
 		int deleted = cartItemRepository.deleteAllByIdInAndMemberId(orderedItemIds, memberId);
 		if (deleted != orderedItemIds.size()) {
-			throw new BusinessException(CartErrorCode.CART_ITEM_NOT_FOUND);
+			log.warn(
+				"결제 후 장바구니 정리 일부 실패: memberId={}, requested={}, deleted={}",
+				memberId,
+				orderedItemIds.size(),
+				deleted
+			);
 		}
 	}
 }
