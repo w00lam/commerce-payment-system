@@ -296,6 +296,37 @@ public class PaymentService {
 		return payment;
 	}
 
+	@Transactional
+	public PaymentConfirmation confirmPaymentFromWebhook(String paymentId) {
+		if (paymentId == null || paymentId.isBlank()) {
+			throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_ID);
+		}
+
+		Payment payment = loadPaymentForConfirm(paymentId);
+		if (payment.isConfirmed()) {
+			return new PaymentConfirmation(payment, false);
+		}
+
+		validateConfirmableStatus(payment);
+
+		PortOnePaymentResponse portOnePayment = loadPortOnePayment(paymentId);
+		validatePortOnePayment(payment, portOnePayment);
+
+		payment.confirm(resolvePaidAt(portOnePayment));
+
+		return new PaymentConfirmation(payment, true);
+	}
+
+	@Transactional
+	public Payment getPaymentByPaymentIdForUpdate(String paymentId) {
+		if (paymentId == null || paymentId.isBlank()) {
+			throw new PaymentException(PaymentErrorCode.INVALID_PAYMENT_ID);
+		}
+
+		return paymentRepository.findByPaymentIdForUpdate(paymentId)
+			.orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+	}
+
 	public Payment getPaymentById(Long id) {
 		return paymentRepository.findById(id)
 			.orElseThrow(() -> new PaymentException(PaymentErrorCode.PAYMENT_NOT_FOUND));
@@ -339,5 +370,11 @@ public class PaymentService {
 	@Transactional(readOnly = true)
 	public Optional<PaymentCreateResult> findPaymentByOrderId(Long orderId) {
 		return paymentRepository.findByOrderId(orderId).map(PaymentCreateResult::from);
+	}
+
+	public record PaymentConfirmation(
+		Payment payment,
+		boolean confirmedNow
+	) {
 	}
 }

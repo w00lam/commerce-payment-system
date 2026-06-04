@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -114,6 +115,10 @@ public class RefundService {
 
 	public List<Refund> getExistingRefunds(Long paymentId) {
 		return refundRepository.findByPaymentId(paymentId);
+	}
+
+	public Optional<Refund> findProcessingRefund(Long paymentId) {
+		return refundRepository.findFirstByPaymentIdAndStatusOrderByIdAsc(paymentId, RefundStatus.PROCESSING);
 	}
 
 	public boolean isFullRefund(
