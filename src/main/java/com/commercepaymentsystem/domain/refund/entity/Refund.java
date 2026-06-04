@@ -143,6 +143,10 @@ public class Refund extends BaseEntity {
 		this.status = this.status.fail();
 	}
 
+	public void failPostProcess() {
+		this.status = this.status.failPostProcess();
+	}
+
 	private static void validatePaymentId(Long paymentId) {
 		if (paymentId == null || paymentId <= 0) {
 			throw new RefundException(RefundErrorCode.INVALID_PAYMENT_ID);
