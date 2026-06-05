@@ -17,7 +17,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: false     # 운영 환경 성능 및 보안을 위해 SQL 로그 출력 비활성화
     properties:
       hibernate:

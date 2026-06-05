@@ -34,6 +34,8 @@ dependencies {
     implementation 'io.portone:server-sdk:0.24.0'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
     annotationProcessor 'org.projectlombok:lombok'
 
     // JWT
