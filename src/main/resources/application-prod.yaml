@@ -23,7 +23,7 @@ spring:
       hibernate:
         format_sql: false
         dialect: org.hibernate.dialect.MySQLDialect
-    defer-datasource-initialization: true
+    defer-datasource-initialization: false
 
   sql:
     init:
