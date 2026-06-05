@@ -76,8 +76,8 @@ CREATE TABLE subscription_invoices (
 INSERT INTO membership_grades (name, min_cumulative_payment_amount, point_reward_rate, created_at, updated_at)
 VALUES 
 ('NORMAL', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('VIP', 100000, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('VVIP', 500000, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('VIP', 50000, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('VVIP', 100000, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO plans (name, monthly_amount, description, created_at, updated_at)
 VALUES
