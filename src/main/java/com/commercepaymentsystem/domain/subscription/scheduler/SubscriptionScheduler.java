@@ -35,6 +35,8 @@ public class SubscriptionScheduler {
 		this.executor.setMaxPoolSize(20);
 		this.executor.setQueueCapacity(500);
 		this.executor.setThreadNamePrefix("sub-billing-");
+		this.executor.setWaitForTasksToCompleteOnShutdown(true);
+		this.executor.setAwaitTerminationSeconds(30);
 		this.executor.initialize();
 	}
 
