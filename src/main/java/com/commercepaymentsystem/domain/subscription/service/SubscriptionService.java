@@ -22,8 +22,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
+import com.commercepaymentsystem.domain.point.service.PointService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -37,6 +39,7 @@ public class SubscriptionService {
 	private final SubscriptionInvoiceRepository subscriptionInvoiceRepository;
 	private final MemberMembershipRepository memberMembershipRepository;
 	private final SubscriptionPaymentService subscriptionPaymentService;
+	private final PointService pointService;
 
 	/**
 	 * 결제 수단(빌링키) 등록
@@ -60,7 +63,7 @@ public class SubscriptionService {
 	/**
 	 * 구독 시작 (빌링키 발급 + 첫 결제 즉시 진행)
 	 */
-	@Transactional
+	@Transactional(noRollbackFor = SubscriptionException.class)
 	public SubscriptionResponse startSubscription(Long memberId, StartSubscriptionRequest request) {
 		Plan plan = planRepository.findById(request.getPlanId())
 			.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.PLAN_NOT_FOUND));
@@ -118,6 +121,11 @@ public class SubscriptionService {
 			long earnedPoints = plan.getMonthlyAmount() * rewardRate / 100;
 			invoice.markAsSucceeded(earnedPoints, LocalDateTime.now());
 			subscriptionInvoiceRepository.save(invoice);
+
+			// 포인트 적립 연동
+			if (earnedPoints > 0) {
+				pointService.earnPoint(memberId, earnedPoints, invoice.getId());
+			}
 		} else {
 			// 첫 결제 실패 시 구독 즉시 해지(CANCELLED)로 롤백하고 400 예외 반환
 			subscription.cancel();
@@ -205,6 +213,11 @@ public class SubscriptionService {
 			invoice.markAsSucceeded(earnedPoints, LocalDateTime.now());
 			subscriptionInvoiceRepository.save(invoice);
 
+			// 포인트 적립 연동
+			if (earnedPoints > 0) {
+				pointService.earnPoint(subscription.getMemberId(), earnedPoints, invoice.getId());
+			}
+
 			// 다음 결제일 갱신 (말일 클램프 로직 반영)
 			subscription.renewNextBillingDate();
 			subscriptionRepository.save(subscription);
@@ -213,5 +226,29 @@ public class SubscriptionService {
 			invoice.markAsFailed(paymentResult.getFailureReason());
 			subscriptionInvoiceRepository.save(invoice);
 		}
+	}
+
+	/**
+	 * 스케줄러가 개별 구독 건에 대해 비관적 락을 획득하고 트랜잭션을 처리하기 위해 호출하는 메서드
+	 */
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
+	public void processBillingWithLock(Long subscriptionId, LocalDate today) {
+		Subscription subscription = subscriptionRepository.findByIdWithPessimisticLock(subscriptionId)
+			.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
+
+		// 결제 상태 및 결제 기한 더블 체크 (락 획득 후 다른 스레드가 이미 선점해서 완료했는지 검증)
+		if (subscription.getStatus() != SubscriptionStatus.ACTIVE || subscription.getNextBillingDate().isAfter(today)) {
+			return;
+		}
+
+		// 결제 기한이 오늘 이전(어제 이하)인 경우: 결제 실패 후 하루가 경과했으므로 미납 정지/해지 처리
+		if (subscription.getNextBillingDate().isBefore(today)) {
+			subscription.cancel();
+			subscriptionRepository.save(subscription);
+			return;
+		}
+
+		// 오늘이 결제일인 경우: 결제 처리 진행
+		executeBilling(subscription, today);
 	}
 }

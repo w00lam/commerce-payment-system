@@ -31,17 +31,17 @@ public class SubscriptionScheduler {
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 		log.info("Starting regular subscription billing scheduler for date: {}", today);
 
-		List<Subscription> dueSubscriptions = subscriptionRepository.findAllByStatusAndNextBillingDate(
+		List<Subscription> dueSubscriptions = subscriptionRepository.findAllByStatusAndNextBillingDateLessThanEqual(
 			SubscriptionStatus.ACTIVE,
 			today
 		);
 
-		log.info("Found {} subscriptions due for billing today.", dueSubscriptions.size());
+		log.info("Found {} subscriptions due or overdue for billing.", dueSubscriptions.size());
 
 		for (Subscription subscription : dueSubscriptions) {
 			try {
-				subscriptionService.executeBilling(subscription, today);
-				log.info("Billing successfully processed for subscription ID: {}", subscription.getId());
+				subscriptionService.processBillingWithLock(subscription.getId(), today);
+				log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
 			} catch (Exception e) {
 				log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
 			}
