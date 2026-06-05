@@ -16,7 +16,7 @@ import com.commercepaymentsystem.domain.webhook.exception.WebhookException;
 
 class PortOneWebhookSignatureVerifierTest {
 
-	private static final String SECRET = System.getenv("PORTONE_WEBHOOK_SECRET");
+	private static final String SECRET = "whsec_dGVzdF93ZWJob29rX3NlY3JldA==";
 
 	private final PortOneWebhookSignatureVerifier verifier = new PortOneWebhookSignatureVerifier(
 		new PortOneWebhookProperties(SECRET)

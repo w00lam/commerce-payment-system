@@ -49,7 +49,7 @@ public class CartItem extends BaseEntity {
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    @Column(nullable = false, columnDefinition = "INT UNSIGNED")
+    @Column(nullable = false)
     private Long quantity;
 
     /**

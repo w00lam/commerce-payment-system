@@ -1,0 +1,105 @@
+name: Deploy to Private EC2 (Docker)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew clean test bootJar
+
+      # ARM64 빌드를 위한 QEMU 및 Buildx 설정
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ECR에 ARM64용 도커 이미지 빌드 & 푸시 (latest & commit sha 태그 적용)
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/commerce-payment:latest
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/commerce-payment:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # AWS SSM Run Command를 사용하여 비공개 EC2에 배포 명령 전송 (무중단 롤링)
+      - name: Deploy to Private EC2 via SSM
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploying commerce-payment-system container with zero-downtime" \
+            --parameters 'commands=[
+              "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com",
+              "docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/commerce-payment:${{ github.sha }}",
+              "if docker ps --format \"{{.Names}}\" | grep -q \"^commerce-payment-a$\"; then ACTIVE=\"a\"; NEXT=\"b\"; ACTIVE_PORT=8080; NEXT_PORT=8081; else ACTIVE=\"b\"; NEXT=\"a\"; ACTIVE_PORT=8081; NEXT_PORT=8080; fi",
+              "echo \"Active: $ACTIVE ($ACTIVE_PORT) | Next: $NEXT ($NEXT_PORT)\"",
+              "TARGET_GROUP_ARN=$(aws ssm get-parameter --name \"/config/prod/ALB_TARGET_GROUP_ARN\" --with-decryption --region ${{ secrets.AWS_REGION }} --query \"Parameter.Value\" --output text)",
+              "TOKEN=$(curl -s -X PUT \"http://169.254.169.254/latest/api/token\" -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\")",
+              "INSTANCE_ID=$(curl -s -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/instance-id)",
+              "rm -f .env",
+              "aws ssm get-parameters-by-path --path \"/config/prod/\" --with-decryption --region ${{ secrets.AWS_REGION }} --query \"Parameters[*].[Name,Value]\" --output text | while read -r name value; do var_name=${name##*/}; echo \"${var_name}=${value}\" >> .env; done",
+              "docker run -d --name \"commerce-payment-$NEXT\" -p $NEXT_PORT:8080 --env-file .env --restart always ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/commerce-payment:${{ github.sha }}",
+              "HEALTHY=false",
+              "for i in {1..12}; do if curl -s http://localhost:$NEXT_PORT/index.html > /dev/null || curl -s http://localhost:$NEXT_PORT/health > /dev/null; then HEALTHY=true; break; fi; sleep 5; done",
+              "if [ \"$HEALTHY\" != \"true\" ]; then docker stop \"commerce-payment-$NEXT\" && docker rm \"commerce-payment-$NEXT\" && exit 1; fi",
+              "aws elbv2 register-targets --target-group-arn \"$TARGET_GROUP_ARN\" --targets Id=\"$INSTANCE_ID\",Port=$NEXT_PORT --region ${{ secrets.AWS_REGION }}",
+              "aws elbv2 wait target-in-service --target-group-arn \"$TARGET_GROUP_ARN\" --targets Id=\"$INSTANCE_ID\",Port=$NEXT_PORT --region ${{ secrets.AWS_REGION }}",
+              "if docker ps -a --format \"{{.Names}}\" | grep -q \"^commerce-payment-$ACTIVE$\"; then aws elbv2 deregister-targets --target-group-arn \"$TARGET_GROUP_ARN\" --targets Id=\"$INSTANCE_ID\",Port=$ACTIVE_PORT --region ${{ secrets.AWS_REGION }} && sleep 15 && docker stop \"commerce-payment-$ACTIVE\" && docker rm \"commerce-payment-$ACTIVE\"; fi",
+              "docker image prune -af"
+            ]' \
+            --query "Command.CommandId" \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          
+          echo "SSM Command sent. Command ID: $COMMAND_ID"
+          
+          # Wait for command execution and fail the build step if command fails
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
+            --region ${{ secrets.AWS_REGION }}

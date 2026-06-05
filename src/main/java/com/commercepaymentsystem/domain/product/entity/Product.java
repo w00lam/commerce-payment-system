@@ -40,10 +40,10 @@ public class Product extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, columnDefinition = "INT UNSIGNED")
+    @Column(nullable = false)
     private Long price; // INT_UNSIGNED에 맞춰 Long 사용
 
-    @Column(nullable = false, columnDefinition = "INT UNSIGNED")
+    @Column(nullable = false)
     private Long stock; // 재고 수량
 
     @Column(length = 255)

@@ -29,6 +29,7 @@ public class SecurityConfig {
 
 	private static final String[] PUBLIC_PAGE_URLS = {
 		"/",
+		"/health",
 		"/login",
 		"/signup",
 		"/products/**",

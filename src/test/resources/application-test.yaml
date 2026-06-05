@@ -15,11 +15,13 @@ spring:
   sql:
     init:
       mode: never
+  flyway:
+    enabled: false
 
 # 테스트용 목업 환경 변수 설정 (PlaceholderResolutionException 방지)
 jwt:
-  secret: c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk=
-  expiration: 3600000
+  secret: c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk= # Base64 encoded test key
+  expiration: 3600000 # 1시간 (ms)
 
 portone:
   base-url: "https://api.portone.io"
@@ -29,4 +31,4 @@ portone:
   connect-timeout: 1s
   read-timeout: 3s
   webhook:
-    secret: ${PORTONE_WEBHOOK_SECRET}
+    secret: ${PORTONE_WEBHOOK_SECRET:test_webhook_secret}

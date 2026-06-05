@@ -31,7 +31,6 @@ public class WebhookEvent extends BaseEntity {
 	@Column(name = "event_type", nullable = false, length = 100)
 	private String eventType;
 
-	@Lob
 	@Column(name = "payload", nullable = false, columnDefinition = "TEXT")
 	private String payload;
 
