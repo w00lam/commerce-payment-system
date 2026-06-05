@@ -42,10 +42,10 @@ public class Order extends BaseEntity {
 	@Column(nullable = false, unique = true, length = 50)
 	private String orderNumber;
 
-	@Column(name = "total_price", nullable = false, columnDefinition = "int UNSIGNED")
+	@Column(name = "total_price", nullable = false)
 	private Long totalPrice;
 
-	@Column(nullable = false, columnDefinition = "INT UNSIGNED")
+	@Column(nullable = false)
 	private Long usedPointAmount;
 
 	@Enumerated(EnumType.STRING)

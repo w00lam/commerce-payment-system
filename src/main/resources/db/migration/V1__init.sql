@@ -9,7 +9,7 @@ CREATE TABLE cart_items (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     cart_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
-    quantity INT UNSIGNED NOT NULL,
+    quantity BIGINT NOT NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL,
     CONSTRAINT uk_cart_product UNIQUE (cart_id, product_id)
@@ -30,8 +30,8 @@ CREATE TABLE members (
 CREATE TABLE products (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    price INT UNSIGNED NOT NULL,
-    stock INT UNSIGNED NOT NULL,
+    price BIGINT NOT NULL,
+    stock BIGINT NOT NULL,
     description VARCHAR(255),
     category VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL,
@@ -44,8 +44,8 @@ CREATE TABLE orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     order_number VARCHAR(50) NOT NULL UNIQUE,
     member_id BIGINT NOT NULL,
-    total_price INT UNSIGNED NOT NULL,
-    used_point_amount INT UNSIGNED NOT NULL,
+    total_price BIGINT NOT NULL,
+    used_point_amount BIGINT NOT NULL,
     status VARCHAR(50) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL
@@ -56,8 +56,8 @@ CREATE TABLE order_items (
     order_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     product_name VARCHAR(200) NOT NULL,
-    order_price INT UNSIGNED NOT NULL,
-    quantity INT UNSIGNED NOT NULL,
+    order_price BIGINT NOT NULL,
+    quantity BIGINT NOT NULL,
     source_cart_item_id BIGINT,
     created_at DATETIME(6) NOT NULL,
     updated_at DATETIME(6) NOT NULL
