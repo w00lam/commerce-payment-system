@@ -31,7 +31,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SubscriptionService {
 
@@ -43,11 +42,29 @@ public class SubscriptionService {
 	private final SubscriptionPaymentService subscriptionPaymentService;
 	private final PointService pointService;
 	private final PlatformTransactionManager transactionManager;
+	private final TransactionTemplate requiresNewTxTemplate;
 
-	private TransactionTemplate getRequiresNewTxTemplate() {
-		TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-		txTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-		return txTemplate;
+	public SubscriptionService(
+		PaymentMethodRepository paymentMethodRepository,
+		PlanRepository planRepository,
+		SubscriptionRepository subscriptionRepository,
+		SubscriptionInvoiceRepository subscriptionInvoiceRepository,
+		MemberMembershipRepository memberMembershipRepository,
+		SubscriptionPaymentService subscriptionPaymentService,
+		PointService pointService,
+		PlatformTransactionManager transactionManager
+	) {
+		this.paymentMethodRepository = paymentMethodRepository;
+		this.planRepository = planRepository;
+		this.subscriptionRepository = subscriptionRepository;
+		this.subscriptionInvoiceRepository = subscriptionInvoiceRepository;
+		this.memberMembershipRepository = memberMembershipRepository;
+		this.subscriptionPaymentService = subscriptionPaymentService;
+		this.pointService = pointService;
+		this.transactionManager = transactionManager;
+
+		this.requiresNewTxTemplate = new TransactionTemplate(transactionManager);
+		this.requiresNewTxTemplate.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 	}
 
 	private static class StartSubscriptionTxResult {
@@ -137,7 +154,7 @@ public class SubscriptionService {
 	 */
 	public SubscriptionResponse startSubscription(Long memberId, StartSubscriptionRequest request) {
 		// 1. Transaction 1: Create subscription and pending invoice
-		StartSubscriptionTxResult txResult = getRequiresNewTxTemplate().execute(status -> {
+		StartSubscriptionTxResult txResult = requiresNewTxTemplate.execute(status -> {
 			Plan plan = planRepository.findById(request.getPlanId())
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.PLAN_NOT_FOUND));
 
@@ -169,7 +186,8 @@ public class SubscriptionService {
 				rewardRate = memberMembership.get().getMembershipGrade().getPointRewardRate();
 			}
 
-			String billingPeriod = subscription.getStartedAt().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+			// 결제 주기를 가입 예정일 기준으로 통일
+			String billingPeriod = subscription.getStartedAt().toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
 			String portonePaymentId = "sub-first-" + UUID.randomUUID().toString().substring(0, 8);
 
 			SubscriptionInvoice invoice = SubscriptionInvoice.createPending(
@@ -191,21 +209,28 @@ public class SubscriptionService {
 			);
 		});
 
-		// 2. Call external PG API outside transaction
-		SubscriptionPaymentService.PaymentResult paymentResult = subscriptionPaymentService.pay(
-			txResult.getBillingKey(),
-			txResult.getBillingAmount(),
-			txResult.getPlanName()
-		);
+		// 2. Call external PG API outside transaction with try-catch safety net
+		SubscriptionPaymentService.PaymentResult paymentResult;
+		try {
+			paymentResult = subscriptionPaymentService.pay(
+				txResult.getBillingKey(),
+				txResult.getBillingAmount(),
+				txResult.getPlanName()
+			);
+		} catch (Exception e) {
+			paymentResult = SubscriptionPaymentService.PaymentResult.fail("첫 결제 PG API 호출 중 예외 발생: " + e.getMessage());
+		}
+
+		final SubscriptionPaymentService.PaymentResult finalPaymentResult = paymentResult;
 
 		// 3. Transaction 2: Complete subscription status (Success/Failure)
-		getRequiresNewTxTemplate().executeWithoutResult(status -> {
+		requiresNewTxTemplate.executeWithoutResult(status -> {
 			Subscription subscription = subscriptionRepository.findById(txResult.getSubscriptionId())
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
 			SubscriptionInvoice invoice = subscriptionInvoiceRepository.findById(txResult.getInvoiceId())
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
 
-			if (paymentResult.isSuccess()) {
+			if (finalPaymentResult.isSuccess()) {
 				// 첫 결제 성공 시 인보이스 상태 업데이트 및 구독 활성화 유지
 				long earnedPoints = invoice.getBillingAmount() * invoice.getPointRewardRate() / 100;
 				invoice.markAsSucceeded(earnedPoints, LocalDateTime.now());
@@ -220,15 +245,15 @@ public class SubscriptionService {
 				subscription.cancel();
 				subscriptionRepository.save(subscription);
 
-				invoice.markAsFailed(paymentResult.getFailureReason());
+				invoice.markAsFailed(finalPaymentResult.getFailureReason());
 				subscriptionInvoiceRepository.save(invoice);
 			}
 		});
 
-		if (!paymentResult.isSuccess()) {
+		if (!finalPaymentResult.isSuccess()) {
 			throw new SubscriptionException(
 				SubscriptionErrorCode.FIRST_PAYMENT_FAILED,
-				"첫 결제 실패: " + paymentResult.getFailureReason()
+				"첫 결제 실패: " + finalPaymentResult.getFailureReason()
 			);
 		}
 
@@ -269,7 +294,7 @@ public class SubscriptionService {
 	 */
 	public void processBillingWithLock(Long subscriptionId, LocalDate today) {
 		// 1. Transaction 1: Lock subscription, perform checks, and create PENDING invoice if valid
-		PrepareBillingResult result = getRequiresNewTxTemplate().execute(status -> {
+		PrepareBillingResult result = requiresNewTxTemplate.execute(status -> {
 			Subscription subscription = subscriptionRepository.findByIdWithPessimisticLock(subscriptionId)
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
 
@@ -278,17 +303,28 @@ public class SubscriptionService {
 				return PrepareBillingResult.skipped();
 			}
 
-			// 결제 기한이 오늘 이전(어제 이하)인 경우: 결제 실패 후 하루가 경과했으므로 미납 정지/해지 처리 즉시 반영
-			if (subscription.getNextBillingDate().isBefore(today)) {
-				subscription.cancel();
-				subscriptionRepository.save(subscription);
-				return PrepareBillingResult.cancelled();
-			}
+			// 결제 주기를 판단하는 날짜의 기준은 실행일(today)이 아니라 원래 해당 구독의 결제 예정일(subscription.getNextBillingDate())로 지정
+			String billingPeriod = subscription.getNextBillingDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
-			// 중복 결제 방지: 해당 빌링 주기에 이미 인보이스가 존재하는지 체크
-			String billingPeriod = today.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-			if (subscriptionInvoiceRepository.existsBySubscriptionIdAndBillingPeriod(subscription.getId(), billingPeriod)) {
-				return PrepareBillingResult.skipped();
+			// 결제 기한이 오늘 이전(어제 이하)인 경우
+			if (subscription.getNextBillingDate().isBefore(today)) {
+				Optional<SubscriptionInvoice> existingInvoice = subscriptionInvoiceRepository.findBySubscriptionIdAndBillingPeriod(subscription.getId(), billingPeriod);
+				if (existingInvoice.isPresent()) {
+					if (existingInvoice.get().getStatus() == InvoiceStatus.FAILED) {
+						// 실제 청구 주기에 결제 시도 실패 기록이 있는 경우에만 미납 정지/해지 처리 즉시 반영
+						subscription.cancel();
+						subscriptionRepository.save(subscription);
+						return PrepareBillingResult.cancelled();
+					}
+					// 이미 성공했거나 대기 중인 경우 스킵
+					return PrepareBillingResult.skipped();
+				}
+				// 결제 시도 이력이 없는 경우, 즉시 해지하지 않고 결제 시도를 먼저 선행하도록 대기 (fall-through)
+			} else {
+				// 오늘이 결제 예정일인 경우 중복 결제 방지
+				if (subscriptionInvoiceRepository.existsBySubscriptionIdAndBillingPeriod(subscription.getId(), billingPeriod)) {
+					return PrepareBillingResult.skipped();
+				}
 			}
 
 			Plan plan = subscription.getPlan();
@@ -326,21 +362,28 @@ public class SubscriptionService {
 			return;
 		}
 
-		// 2. Call external PG API outside transaction
-		SubscriptionPaymentService.PaymentResult paymentResult = subscriptionPaymentService.pay(
-			result.getBillingKey(),
-			result.getBillingAmount(),
-			result.getPlanName()
-		);
+		// 2. Call external PG API outside transaction with try-catch safety net
+		SubscriptionPaymentService.PaymentResult paymentResult;
+		try {
+			paymentResult = subscriptionPaymentService.pay(
+				result.getBillingKey(),
+				result.getBillingAmount(),
+				result.getPlanName()
+			);
+		} catch (Exception e) {
+			paymentResult = SubscriptionPaymentService.PaymentResult.fail("PG 결제 API 호출 중 예외 발생: " + e.getMessage());
+		}
+
+		final SubscriptionPaymentService.PaymentResult finalPaymentResult = paymentResult;
 
 		// 3. Transaction 2: Finalize billing status (Success/Failure)
-		getRequiresNewTxTemplate().executeWithoutResult(status -> {
+		requiresNewTxTemplate.executeWithoutResult(status -> {
 			Subscription subscription = subscriptionRepository.findById(result.getSubscriptionId())
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
 			SubscriptionInvoice invoice = subscriptionInvoiceRepository.findById(result.getInvoiceId())
 				.orElseThrow(() -> new SubscriptionException(SubscriptionErrorCode.SUBSCRIPTION_NOT_FOUND));
 
-			if (paymentResult.isSuccess()) {
+			if (finalPaymentResult.isSuccess()) {
 				long earnedPoints = invoice.getBillingAmount() * invoice.getPointRewardRate() / 100;
 				invoice.markAsSucceeded(earnedPoints, LocalDateTime.now());
 				subscriptionInvoiceRepository.save(invoice);
@@ -352,7 +395,7 @@ public class SubscriptionService {
 				subscription.renewNextBillingDate();
 				subscriptionRepository.save(subscription);
 			} else {
-				invoice.markAsFailed(paymentResult.getFailureReason());
+				invoice.markAsFailed(finalPaymentResult.getFailureReason());
 				subscriptionInvoiceRepository.save(invoice);
 			}
 		});

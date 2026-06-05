@@ -6,22 +6,37 @@ import com.commercepaymentsystem.domain.subscription.repository.SubscriptionRepo
 import com.commercepaymentsystem.domain.subscription.service.SubscriptionService;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import lombok.RequiredArgsConstructor;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @EnableScheduling
-@RequiredArgsConstructor
 public class SubscriptionScheduler {
 
 	private final SubscriptionRepository subscriptionRepository;
 	private final SubscriptionService subscriptionService;
+	private final ThreadPoolTaskExecutor executor;
+
+	public SubscriptionScheduler(SubscriptionRepository subscriptionRepository, SubscriptionService subscriptionService) {
+		this.subscriptionRepository = subscriptionRepository;
+		this.subscriptionService = subscriptionService;
+
+		this.executor = new ThreadPoolTaskExecutor();
+		this.executor.setCorePoolSize(10);
+		this.executor.setMaxPoolSize(20);
+		this.executor.setQueueCapacity(500);
+		this.executor.setThreadNamePrefix("sub-billing-");
+		this.executor.initialize();
+	}
 
 	/**
 	 * 매일 00:00 (KST) 실행
@@ -52,16 +67,22 @@ public class SubscriptionScheduler {
 				break;
 			}
 
+			List<CompletableFuture<Void>> futures = new ArrayList<>();
 			for (Subscription subscription : dueSubscriptions.getContent()) {
-				try {
-					subscriptionService.processBillingWithLock(subscription.getId(), today);
-					log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
-				} catch (Exception e) {
-					log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
-				}
+				futures.add(CompletableFuture.runAsync(() -> {
+					try {
+						subscriptionService.processBillingWithLock(subscription.getId(), today);
+						log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
+					} catch (Exception e) {
+						log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
+					}
+				}, executor));
 				lastId = subscription.getId();
 				totalProcessed++;
 			}
+
+			// 현재 슬라이스/페이지의 결제 통신 작업이 모두 끝날 때까지 대기하여 다음 슬라이스 조회
+			CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
 			hasNext = dueSubscriptions.hasNext();
 		}

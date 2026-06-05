@@ -233,19 +233,62 @@ class SubscriptionServiceTest {
 		subscriptionRepository.save(subscription);
 
 		// 다음 결제일을 강제로 어제로 변경
-		org.springframework.test.util.ReflectionTestUtils.setField(subscription, "nextBillingDate", LocalDate.now().minusDays(1));
+		LocalDate yesterday = LocalDate.now().minusDays(1);
+		org.springframework.test.util.ReflectionTestUtils.setField(subscription, "nextBillingDate", yesterday);
 		subscriptionRepository.save(subscription);
+
+		// 실제 청구 주기에 결제 시도 실패 기록이 있는 상태를 모사
+		String billingPeriod = yesterday.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+		SubscriptionInvoice failedInvoice = SubscriptionInvoice.createPending(
+			subscription,
+			billingPeriod,
+			"failed-invoice-id",
+			basicPlan.getMonthlyAmount(),
+			"NORMAL",
+			1
+		);
+		failedInvoice.markAsFailed("한도 초과");
+		subscriptionInvoiceRepository.save(failedInvoice);
 
 		// When: 오늘 날짜 기준으로 배치 처리 실행
 		LocalDate today = LocalDate.now();
 		subscriptionService.processBillingWithLock(subscription.getId(), today);
 
-		// Then: 하루 경과로 정지/해지 처리 (CANCELLED)
+		// Then: 실패 기록이 있으므로 미납 정지/해지 처리 (CANCELLED)
 		Subscription updatedSub = subscriptionRepository.findById(subscription.getId()).orElseThrow();
 		assertThat(updatedSub.getStatus()).isEqualTo(SubscriptionStatus.CANCELLED);
 
-		// 인보이스 발행 기록이 추가되지 않았음을 검증
+		// 인보이스 발행 기록 검증 (이미 실패한 인보이스 1건만 존재)
 		List<SubscriptionInvoice> invoices = subscriptionInvoiceRepository.findAllBySubscriptionId(subscription.getId());
-		assertThat(invoices).isEmpty();
+		assertThat(invoices).hasSize(1);
+		assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.FAILED);
+	}
+
+	@Test
+	void processBillingWithLock_Overdue_WithoutFailedInvoice_AttemptsPayment() {
+		// Given: 다음 결제일이 어제(오늘보다 이전)인 활성 구독
+		Subscription subscription = Subscription.create(member.getId(), basicPlan, successPaymentMethod);
+		subscriptionRepository.save(subscription);
+
+		// 다음 결제일을 강제로 어제로 변경
+		LocalDate yesterday = LocalDate.now().minusDays(1);
+		org.springframework.test.util.ReflectionTestUtils.setField(subscription, "nextBillingDate", yesterday);
+		subscriptionRepository.save(subscription);
+
+		// 결제 시도 기록(인보이스)이 아예 없음 (어제 시스템 다운 등)
+
+		// When: 오늘 날짜 기준으로 배치 처리 실행
+		LocalDate today = LocalDate.now();
+		subscriptionService.processBillingWithLock(subscription.getId(), today);
+
+		// Then: 결제 시도가 선행되어 성공 처리되고, 구독은 계속 ACTIVE 상태를 유지해야 함
+		Subscription updatedSub = subscriptionRepository.findById(subscription.getId()).orElseThrow();
+		assertThat(updatedSub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+
+		// 어제(overdue cycle)분 인보이스가 성공적으로 발행되었는지 검증
+		List<SubscriptionInvoice> invoices = subscriptionInvoiceRepository.findAllBySubscriptionId(subscription.getId());
+		assertThat(invoices).hasSize(1);
+		assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.SUCCEEDED);
+		assertThat(invoices.get(0).getBillingPeriod()).isEqualTo(yesterday.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")));
 	}
 }
