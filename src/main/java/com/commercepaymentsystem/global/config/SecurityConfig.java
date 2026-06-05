@@ -29,6 +29,7 @@ public class SecurityConfig {
 
 	private static final String[] PUBLIC_PAGE_URLS = {
 		"/",
+		"/index.html",
 		"/health",
 		"/login",
 		"/signup",
@@ -36,6 +37,9 @@ public class SecurityConfig {
 		"/cart",
 		"/orders/**",
 		"/checkout",
+		"/css/**",
+		"/js/**",
+		"/images/**",
 		"/favicon.*",
 		"/error"
 	};
