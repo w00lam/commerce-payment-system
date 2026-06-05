@@ -23,8 +23,52 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+	private static final String[] EXCLUDED_PATHS = {
+		"/",
+		"/index.html",
+		"/health",
+		"/login",
+		"/signup",
+		"/api/auth/signup",
+		"/api/auth/login",
+		"/api/products",
+		"/api/products/",
+		"/api/webhooks",
+		"/api/webhooks/",
+		"/api/config",
+		"/api/config/",
+		"/api/payments/webhooks/portone",
+		"/products",
+		"/products/",
+		"/cart",
+		"/orders",
+		"/orders/",
+		"/checkout",
+		"/css/",
+		"/js/",
+		"/images/",
+		"/favicon",
+		"/error"
+	};
+
 	private final JwtProvider jwtProvider;
 	private final ObjectMapper objectMapper;
+
+	@Override
+	protected boolean shouldNotFilter(HttpServletRequest request) {
+		String path = request.getRequestURI();
+
+		for (String excludedPath : EXCLUDED_PATHS) {
+			if ("/".equals(excludedPath) && "/".equals(path)) {
+				return true;
+			}
+			if (!"/".equals(excludedPath) && path.startsWith(excludedPath)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request,
