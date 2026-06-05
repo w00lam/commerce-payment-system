@@ -1,0 +1,39 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/commerce_payment
+    username: root
+    password: 
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always  # dev 환경에서는 data.sql 자동 실행
+
+jwt:
+  secret: c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk= # Base64 encoded test key
+  expiration: 3600000 # 1시간 (ms)
+
+portone:
+  base-url: "https://api.portone.io"
+  api-secret: test_api_secret
+  store-id: test_store_id
+  channel-key: test_channel_key
+  connect-timeout: 2s
+  read-timeout: 5s
+  webhook:
+    secret: test_webhook_secret
