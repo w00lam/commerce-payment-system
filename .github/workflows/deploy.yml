@@ -22,7 +22,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew clean bootJar -x test # 테스트는 일단 예외 처리 (필요시 제외 가능)
+        run: ./gradlew clean test bootJar
 
       # ARM64 빌드를 위한 QEMU 및 Buildx 설정
       - name: Set up QEMU
@@ -69,7 +69,7 @@ jobs:
       # AWS SSM Run Command를 사용하여 비공개 EC2에 배포 명령 전송 (무중단 롤링)
       - name: Deploy to Private EC2 via SSM
         run: |
-          aws ssm send-command \
+          COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploying commerce-payment-system container with zero-downtime" \
@@ -92,4 +92,14 @@ jobs:
               "if docker ps -a --format \"{{.Names}}\" | grep -q \"^commerce-payment-\$ACTIVE$\"; then aws elbv2 deregister-targets --target-group-arn \"\$TARGET_GROUP_ARN\" --targets Id=\"\$INSTANCE_ID\",Port=\$ACTIVE_PORT --region ${{ secrets.AWS_REGION }} && sleep 15 && docker stop \"commerce-payment-\$ACTIVE\" && docker rm \"commerce-payment-\$ACTIVE\"; fi",
               "docker image prune -af"
             ]' \
+            --query "Command.CommandId" \
+            --output text \
+            --region ${{ secrets.AWS_REGION }})
+          
+          echo "SSM Command sent. Command ID: $COMMAND_ID"
+          
+          # Wait for command execution and fail the build step if command fails
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
             --region ${{ secrets.AWS_REGION }}
