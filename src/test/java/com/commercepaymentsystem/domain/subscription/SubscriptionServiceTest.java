@@ -109,6 +109,23 @@ class SubscriptionServiceTest {
 	}
 
 	@Test
+	void registerPaymentMethod_Failure_AlreadyRegisteredByOtherMember() {
+		Member otherMember = memberRepository.save(Member.create(
+			"other@example.com",
+			"password123",
+			"Other User",
+			"010-9999-8888"
+		));
+		RegisterPaymentMethodRequest request1 = new RegisterPaymentMethodRequest("DUPLICATE_KEY", "KakaoCard");
+		subscriptionService.registerPaymentMethod(otherMember.getId(), request1);
+
+		RegisterPaymentMethodRequest request2 = new RegisterPaymentMethodRequest("DUPLICATE_KEY", "TossCard");
+		assertThatThrownBy(() -> subscriptionService.registerPaymentMethod(member.getId(), request2))
+			.isInstanceOf(SubscriptionException.class)
+			.hasMessageContaining("이미 다른 회원이 등록한 결제 수단");
+	}
+
+	@Test
 	void startSubscription_Success_FirstPaymentSucceeds() {
 		StartSubscriptionRequest request = new StartSubscriptionRequest(basicPlan.getId(), successPaymentMethod.getId());
 		SubscriptionResponse response = subscriptionService.startSubscription(member.getId(), request);

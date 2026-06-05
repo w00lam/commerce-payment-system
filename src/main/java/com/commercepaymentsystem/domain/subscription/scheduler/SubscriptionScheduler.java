@@ -6,9 +6,10 @@ import com.commercepaymentsystem.domain.subscription.repository.SubscriptionRepo
 import com.commercepaymentsystem.domain.subscription.service.SubscriptionService;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -31,22 +32,40 @@ public class SubscriptionScheduler {
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 		log.info("Starting regular subscription billing scheduler for date: {}", today);
 
-		List<Subscription> dueSubscriptions = subscriptionRepository.findAllByStatusAndNextBillingDateLessThanEqual(
-			SubscriptionStatus.ACTIVE,
-			today
-		);
+		int pageSize = 100;
+		Long lastId = 0L;
+		boolean hasNext = true;
+		long totalProcessed = 0;
 
-		log.info("Found {} subscriptions due or overdue for billing.", dueSubscriptions.size());
+		while (hasNext) {
+			Slice<Subscription> dueSubscriptions = subscriptionRepository
+				.findAllByStatusAndNextBillingDateLessThanEqualAndIdGreaterThanOrderByIdAsc(
+					SubscriptionStatus.ACTIVE,
+					today,
+					lastId,
+					PageRequest.of(0, pageSize)
+				);
 
-		for (Subscription subscription : dueSubscriptions) {
-			try {
-				subscriptionService.processBillingWithLock(subscription.getId(), today);
-				log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
-			} catch (Exception e) {
-				log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
+			log.info("Fetched {} subscriptions due or overdue for billing in this slice.", dueSubscriptions.getNumberOfElements());
+
+			if (dueSubscriptions.isEmpty()) {
+				break;
 			}
+
+			for (Subscription subscription : dueSubscriptions.getContent()) {
+				try {
+					subscriptionService.processBillingWithLock(subscription.getId(), today);
+					log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
+				} catch (Exception e) {
+					log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
+				}
+				lastId = subscription.getId();
+				totalProcessed++;
+			}
+
+			hasNext = dueSubscriptions.hasNext();
 		}
 
-		log.info("Subscription billing scheduler completed for date: {}", today);
+		log.info("Subscription billing scheduler completed for date: {}. Total processed: {}", today, totalProcessed);
 	}
 }

@@ -43,6 +43,12 @@ public enum SubscriptionErrorCode implements ErrorCode {
 		HttpStatus.BAD_REQUEST,
 		"SUB_006",
 		"구독 시작 결제에 실패하여 구독을 진행할 수 없습니다."
+	),
+
+	DUPLICATE_BILLING_KEY(
+		HttpStatus.CONFLICT,
+		"SUB_007",
+		"이미 다른 회원이 등록한 결제 수단(빌링키)입니다."
 	);
 
 	private final HttpStatus status;
