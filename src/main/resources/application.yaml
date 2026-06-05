@@ -22,7 +22,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
-    defer-datasource-initialization: true
+    defer-datasource-initialization: false
 
   flyway:
     enabled: true
