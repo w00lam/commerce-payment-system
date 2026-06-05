@@ -1,20 +1,9 @@
 spring:
-  application:
-    name: sparta-payment-system
-
-  profiles:
-    default: local
-
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/commerce_payment}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
-
-  data:
-    web:
-      pageable:
-        one-indexed-parameters: true
 
   jpa:
     open-in-view: false
@@ -27,22 +16,9 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     defer-datasource-initialization: false
 
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 1
-
   sql:
     init:
-      mode: never
-
-  thymeleaf:
-    cache: false
-    prefix: classpath:/templates/
-    suffix: .html
-
-server:
-  port: 8080
+      mode: always
 
 jwt:
   secret: ${JWT_SECRET:c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk=}
