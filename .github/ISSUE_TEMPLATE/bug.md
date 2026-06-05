@@ -1,7 +1,7 @@
 ---
 name: Bug
 about: 버그 수정
-title: "[Bug] "
+title: ""
 labels: ["bug"]
 ---
 
