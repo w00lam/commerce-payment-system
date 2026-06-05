@@ -3,15 +3,20 @@ spring:
     name: sparta-payment-system
 
   datasource:
-    url: jdbc:mysql://localhost:3306/payment_db
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/commerce_payment}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
 
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: create
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
@@ -19,9 +24,14 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     defer-datasource-initialization: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+
   sql:
     init:
-      mode: always  # data.sql 자동 실행
+      mode: never  # 운영/공용 환경에서는 data.sql 자동 실행 방지
 
   thymeleaf:
     cache: false
@@ -33,12 +43,24 @@ server:
 
 # JWT 설정
 jwt:
-  secret: "c3BhcnRhLXBheW1lbnQtand0LXNlY3JldC1rZXktZm9yLWJvb3RjYW1wLTIwMjYtdmVyeS1sb25nLXNlY3JldA=="  # Base64 encoded
-  expiration: 3600000  # 1시간 (ms)
+  secret: ${JWT_SECRET:c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk=} # Base64 encoded test key
+  expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000} # 1시간 (ms)
 
 portone:
   base-url: "https://api.portone.io"
-  api-secret: ${PORTONE_API_SECRET}
-  store-id: ${PORTONE_STORE_ID}
-  channel-key: ${PORTONE_CHANNEL_KEY}
-  webhook-secret: ${PORTONE_WEBHOOK_SECRET}
+  api-secret: ${PORTONE_API_SECRET:test_api_secret}
+  store-id: ${PORTONE_STORE_ID:test_store_id}
+  channel-key: ${PORTONE_CHANNEL_KEY:test_channel_key}
+  connect-timeout: ${PORTONE_CONNECT_TIMEOUT:2s}
+  read-timeout: ${PORTONE_READ_TIMEOUT:5s}
+  webhook:
+    secret: ${PORTONE_WEBHOOK_SECRET:test_webhook_secret}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  sql:
+    init:
+      mode: always  # local 환경에서만 샘플 데이터(data.sql) 실행

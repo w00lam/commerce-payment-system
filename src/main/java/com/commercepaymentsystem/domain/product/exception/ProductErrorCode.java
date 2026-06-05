@@ -1,0 +1,43 @@
+package com.commercepaymentsystem.domain.product.exception;
+
+import org.springframework.http.HttpStatus;
+
+import com.commercepaymentsystem.global.exception.ErrorCode;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
+public enum ProductErrorCode implements ErrorCode {
+
+	PRODUCT_NOT_FOUND(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_001",
+		"상품을 찾을 수 없습니다."
+	),
+
+	INVALID_QUANTITY(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_003",
+		"수량은 1 이상이어야 합니다."
+	),
+
+	OUT_OF_STOCK(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_002",
+		"상품의 재고가 부족합니다."
+	),
+
+	PRODUCT_NOT_ON_SALE(
+		HttpStatus.BAD_REQUEST,
+		"PRODUCT_004",
+		"판매 중인 상품이 아닙니다."
+	);
+
+
+
+	private final HttpStatus status;
+	private final String code;
+	private final String message;
+}

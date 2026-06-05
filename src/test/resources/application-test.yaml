@@ -1,0 +1,34 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: false
+
+# 테스트용 목업 환경 변수 설정 (PlaceholderResolutionException 방지)
+jwt:
+  secret: c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk= # Base64 encoded test key
+  expiration: 3600000 # 1시간 (ms)
+
+portone:
+  base-url: "https://api.portone.io"
+  api-secret: "test_api_secret"
+  store-id: "test_store_id"
+  channel-key: "test_channel_key"
+  connect-timeout: 1s
+  read-timeout: 3s
+  webhook:
+    secret: ${PORTONE_WEBHOOK_SECRET:test_webhook_secret}

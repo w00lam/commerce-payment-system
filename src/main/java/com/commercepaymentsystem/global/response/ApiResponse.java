@@ -1,7 +1,7 @@
 package com.commercepaymentsystem.global.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.commercepaymentsystem.global.exception.ErrorCode;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.Getter;
 
@@ -22,11 +22,11 @@ public class ApiResponse<T> {
 	}
 
 	public static <T> ApiResponse<T> ok(T data) {
-		return new ApiResponse<>(SUCCESS_CODE, null, data);
+		return new ApiResponse<>(SUCCESS_CODE, "요청 성공", data);
 	}
 
 	public static ApiResponse<Void> ok() {
-		return new ApiResponse<>(SUCCESS_CODE, null, null);
+		return new ApiResponse<>(SUCCESS_CODE, "요청 성공", null);
 	}
 
 	public static ApiResponse<Void> error(ErrorCode errorCode) {
