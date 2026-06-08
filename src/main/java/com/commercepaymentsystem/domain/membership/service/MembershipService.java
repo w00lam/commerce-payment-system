@@ -51,9 +51,10 @@ public class MembershipService {
 		Long memberId,
 		Long paidAmount
 	) {
+		long validPaidAmount = validateMembershipAmount(paidAmount);
 		MemberMembership membership = getMembershipForUpdate(memberId);
 
-		membership.increaseCumulativePaymentAmount(paidAmount);
+		membership.increaseCumulativePaymentAmount(validPaidAmount);
 		membership.changeGrade(resolveGrade(membership.getCumulativePaymentAmount()));
 	}
 
@@ -62,9 +63,10 @@ public class MembershipService {
 		Long memberId,
 		Long refundAmount
 	) {
+		long validRefundAmount = validateMembershipAmount(refundAmount);
 		MemberMembership membership = getMembershipForUpdate(memberId);
 
-		membership.decreaseCumulativePaymentAmount(refundAmount);
+		membership.decreaseCumulativePaymentAmount(validRefundAmount);
 		membership.changeGrade(resolveGrade(membership.getCumulativePaymentAmount()));
 	}
 
@@ -139,5 +141,15 @@ public class MembershipService {
 
 	private Long nullToZero(Long amount) {
 		return amount == null ? 0L : amount;
+	}
+
+	private long validateMembershipAmount(Long amount) {
+		if (amount == null || amount < 0) {
+			throw new BusinessException(
+				MembershipErrorCode.INVALID_CUMULATIVE_PAYMENT_AMOUNT
+			);
+		}
+
+		return amount;
 	}
 }
