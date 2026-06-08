@@ -26,18 +26,14 @@ public class SubscriptionScheduler {
 	private final SubscriptionService subscriptionService;
 	private final ThreadPoolTaskExecutor executor;
 
-	public SubscriptionScheduler(SubscriptionRepository subscriptionRepository, SubscriptionService subscriptionService) {
+	public SubscriptionScheduler(
+		SubscriptionRepository subscriptionRepository,
+		SubscriptionService subscriptionService,
+		@org.springframework.beans.factory.annotation.Qualifier("subscriptionBillingExecutor") ThreadPoolTaskExecutor executor
+	) {
 		this.subscriptionRepository = subscriptionRepository;
 		this.subscriptionService = subscriptionService;
-
-		this.executor = new ThreadPoolTaskExecutor();
-		this.executor.setCorePoolSize(10);
-		this.executor.setMaxPoolSize(20);
-		this.executor.setQueueCapacity(500);
-		this.executor.setThreadNamePrefix("sub-billing-");
-		this.executor.setWaitForTasksToCompleteOnShutdown(true);
-		this.executor.setAwaitTerminationSeconds(30);
-		this.executor.initialize();
+		this.executor = executor;
 	}
 
 	/**
@@ -73,10 +69,13 @@ public class SubscriptionScheduler {
 			for (Subscription subscription : dueSubscriptions.getContent()) {
 				futures.add(CompletableFuture.runAsync(() -> {
 					try {
+						log.info("Processing billing for subscription ID: {}, member ID: {}", subscription.getId(), subscription.getMemberId());
 						subscriptionService.processBillingWithLock(subscription.getId(), today);
-						log.info("Billing/Status update successfully processed for subscription ID: {}", subscription.getId());
+						log.info("Successfully processed billing for subscription ID: {}", subscription.getId());
 					} catch (Exception e) {
-						log.error("Failed to process billing for subscription ID: {}", subscription.getId(), e);
+						log.error("CRITICAL ERROR: Failed to process billing for subscription ID: {}. Reason: {}", 
+							subscription.getId(), e.getMessage(), e);
+						// 개별 실패는 로그로 기록하고 다음 건으로 넘어감
 					}
 				}, executor));
 				lastId = subscription.getId();

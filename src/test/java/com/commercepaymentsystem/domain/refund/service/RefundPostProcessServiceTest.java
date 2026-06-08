@@ -14,6 +14,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.refund.entity.Refund;
 import com.commercepaymentsystem.domain.refund.entity.RefundItem;
+import com.commercepaymentsystem.domain.refund.port.RefundMembershipPort;
 import com.commercepaymentsystem.domain.refund.port.RefundOrderPort;
 import com.commercepaymentsystem.domain.refund.port.RefundPointPort;
 import com.commercepaymentsystem.domain.refund.port.RefundProductPort;
@@ -23,11 +24,13 @@ class RefundPostProcessServiceTest {
 	private final RefundOrderPort refundOrderPort = mock(RefundOrderPort.class);
 	private final RefundPointPort refundPointPort = mock(RefundPointPort.class);
 	private final RefundProductPort refundProductPort = mock(RefundProductPort.class);
+	private final RefundMembershipPort refundMembershipPort = mock(RefundMembershipPort.class);
 
 	private final RefundPostProcessService refundPostProcessService = new RefundPostProcessService(
 		refundOrderPort,
 		refundPointPort,
-		refundProductPort
+		refundProductPort,
+		refundMembershipPort
 	);
 
 	@Test
@@ -40,11 +43,12 @@ class RefundPostProcessServiceTest {
 
 		refundPostProcessService.process(payment, 10L, refund, false);
 
-		InOrder inOrder = inOrder(refundOrderPort, refundProductPort, refundPointPort);
+		InOrder inOrder = inOrder(refundOrderPort, refundProductPort, refundPointPort, refundMembershipPort);
 		inOrder.verify(refundOrderPort).restoreProductStock(10L, Map.of(10L, 1L));
 		inOrder.verify(refundProductPort).restoreProductStocks(Map.of(20L, 1L));
 		inOrder.verify(refundPointPort).restorePoint(1L, 1_000L, 100L, 1000L);
 		inOrder.verify(refundPointPort).revokeEarnedPoint(1L, 40L, 100L, 1000L);
+		inOrder.verify(refundMembershipPort).applyRefund(1L, 4_000L);
 		verify(refundPointPort, never()).getRevokedEarnedPointAmount(anyLong());
 		verify(refundOrderPort, never()).cancelOrder(any());
 	}
@@ -61,6 +65,7 @@ class RefundPostProcessServiceTest {
 		refundPostProcessService.process(payment, 10L, refund, true);
 
 		verify(refundPointPort).revokeEarnedPoint(1L, 40L, 100L, 1001L);
+		verify(refundMembershipPort).applyRefund(1L, 4_000L);
 		verify(refundOrderPort).cancelOrder(10L);
 	}
 
@@ -76,6 +81,7 @@ class RefundPostProcessServiceTest {
 
 		verify(refundPointPort, never()).restorePoint(anyLong(), anyLong(), anyLong(), anyLong());
 		verify(refundPointPort).revokeEarnedPoint(1L, 50L, 100L, 1002L);
+		verify(refundMembershipPort).applyRefund(1L, 5_000L);
 	}
 
 	@Test
@@ -94,6 +100,7 @@ class RefundPostProcessServiceTest {
 
 		verify(refundPointPort, never()).restorePoint(anyLong(), anyLong(), anyLong(), anyLong());
 		verify(refundPointPort, never()).revokeEarnedPoint(anyLong(), anyLong(), anyLong(), anyLong());
+		verify(refundMembershipPort, never()).applyRefund(anyLong(), anyLong());
 	}
 
 	private Payment confirmedPayment(Long totalAmount, Long pointAmount, Long pgAmount) {

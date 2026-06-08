@@ -17,17 +17,27 @@ import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.domain.membership.entity.MemberMembership;
+import com.commercepaymentsystem.domain.membership.entity.MembershipGrade;
+import com.commercepaymentsystem.domain.membership.repository.MemberMembershipRepository;
+import com.commercepaymentsystem.domain.membership.repository.MembershipGradeRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.global.jwt.JwtProvider;
 
 class AuthServiceTest {
 
 	private final MemberRepository memberRepository = org.mockito.Mockito.mock(MemberRepository.class);
+	private final MemberMembershipRepository memberMembershipRepository =
+		org.mockito.Mockito.mock(MemberMembershipRepository.class);
+	private final MembershipGradeRepository membershipGradeRepository =
+		org.mockito.Mockito.mock(MembershipGradeRepository.class);
 	private final PasswordEncoder passwordEncoder = org.mockito.Mockito.mock(PasswordEncoder.class);
 	private final JwtProvider jwtProvider = org.mockito.Mockito.mock(JwtProvider.class);
 
 	private final AuthService authService = new AuthService(
 		memberRepository,
+		memberMembershipRepository,
+		membershipGradeRepository,
 		passwordEncoder,
 		jwtProvider
 	);
@@ -46,6 +56,9 @@ class AuthServiceTest {
 		when(memberRepository.existsByEmail(request.email())).thenReturn(false);
 		when(passwordEncoder.encode(request.password())).thenReturn("encodedPassword");
 		when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		MembershipGrade normalGrade = MembershipGrade.create("NORMAL", 0L, 1);
+		when(membershipGradeRepository.findByName("NORMAL"))
+			.thenReturn(Optional.of(normalGrade));
 
 		// when
 		SignupResponse response = authService.signup(request);
@@ -59,6 +72,15 @@ class AuthServiceTest {
 		assertThat(savedMember.getEmail()).isEqualTo("user@example.com");
 		assertThat(savedMember.getPassword()).isEqualTo("encodedPassword");
 		assertThat(savedMember.getPointBalance()).isZero();
+
+		ArgumentCaptor<MemberMembership> membershipCaptor =
+			ArgumentCaptor.forClass(MemberMembership.class);
+		verify(memberMembershipRepository).save(membershipCaptor.capture());
+
+		MemberMembership savedMembership = membershipCaptor.getValue();
+		assertThat(savedMembership.getMember()).isEqualTo(savedMember);
+		assertThat(savedMembership.getMembershipGrade()).isEqualTo(normalGrade);
+		assertThat(savedMembership.getCumulativePaymentAmount()).isZero();
 
 		assertThat(response.email()).isEqualTo("user@example.com");
 		assertThat(response.name()).isEqualTo("홍길동");

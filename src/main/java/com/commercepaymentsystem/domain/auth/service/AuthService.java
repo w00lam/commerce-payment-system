@@ -11,6 +11,11 @@ import com.commercepaymentsystem.domain.auth.dto.SignupResponse;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.exception.MemberErrorCode;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.domain.membership.entity.MemberMembership;
+import com.commercepaymentsystem.domain.membership.entity.MembershipGrade;
+import com.commercepaymentsystem.domain.membership.exception.MembershipErrorCode;
+import com.commercepaymentsystem.domain.membership.repository.MemberMembershipRepository;
+import com.commercepaymentsystem.domain.membership.repository.MembershipGradeRepository;
 import com.commercepaymentsystem.global.exception.BusinessException;
 import com.commercepaymentsystem.global.jwt.JwtProvider;
 
@@ -21,7 +26,11 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class AuthService {
 
+	private static final String DEFAULT_MEMBERSHIP_GRADE_NAME = "NORMAL";
+
 	private final MemberRepository memberRepository;
+	private final MemberMembershipRepository memberMembershipRepository;
+	private final MembershipGradeRepository membershipGradeRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtProvider jwtProvider;
 
@@ -47,6 +56,17 @@ public class AuthService {
 		);
 
 		Member savedMember = memberRepository.save(member);
+		MembershipGrade defaultGrade = membershipGradeRepository
+			.findByName(DEFAULT_MEMBERSHIP_GRADE_NAME)
+			.orElseThrow(() -> new BusinessException(
+				MembershipErrorCode.INVALID_GRADE_POLICY
+			));
+
+		MemberMembership memberMembership = MemberMembership.create(
+			savedMember,
+			defaultGrade
+		);
+		memberMembershipRepository.save(memberMembership);
 
 		return SignupResponse.from(savedMember);
 	}

@@ -8,6 +8,8 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.commercepaymentsystem.infrastructure.portone.config.PortOneProperties;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOneBillingKeyPaymentRequest;
+import com.commercepaymentsystem.infrastructure.portone.dto.PortOneBillingKeyResponse;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelRequest;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelResponse;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentConfirmRequest;
@@ -52,6 +54,89 @@ public class PortOneClient {
 			throw exception;
 		} catch (RestClientException exception) {
 			throw new PortOneException("PortOne 결제 조회 실패: 응답을 해석할 수 없습니다.", exception);
+		}
+	}
+
+	/**
+	 * PortOne V2 빌링키 조회 API를 호출합니다.
+	 */
+	public PortOneBillingKeyResponse getBillingKey(String billingKey) {
+		try {
+			PortOneBillingKeyResponse response = restClient.get()
+				.uri(uriBuilder -> uriBuilder
+					.path("/billing-keys/{billingKey}")
+					.queryParam("storeId", properties.storeId())
+					.build(billingKey))
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.retrieve()
+				.body(PortOneBillingKeyResponse.class);
+
+			if (response == null || isBlank(response.billingKey())) {
+				throw new PortOneException("PortOne 빌링키 조회 실패: 응답이 비어 있습니다.");
+			}
+
+			return response;
+		} catch (RestClientResponseException exception) {
+			throw PortOneExceptionConverter.paymentException(exception, "빌링키 조회");
+		} catch (ResourceAccessException exception) {
+			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 빌링키 조회 요청에 실패했습니다.", exception);
+		} catch (PortOneException exception) {
+			throw exception;
+		} catch (RestClientException exception) {
+			throw new PortOneException("PortOne 빌링키 조회 실패: 응답을 해석할 수 없습니다.", exception);
+		}
+	}
+
+	/**
+	 * PortOne V2 빌링키 삭제 API를 호출합니다.
+	 */
+	public void deleteBillingKey(String billingKey, String reason) {
+		try {
+			restClient.delete()
+				.uri(uriBuilder -> uriBuilder
+					.path("/billing-keys/{billingKey}")
+					.queryParam("storeId", properties.storeId())
+					.queryParam("reason", reason)
+					.build(billingKey))
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.retrieve()
+				.toBodilessEntity();
+		} catch (RestClientResponseException exception) {
+			throw PortOneExceptionConverter.paymentException(exception, "빌링키 삭제");
+		} catch (ResourceAccessException exception) {
+			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 빌링키 삭제 요청에 실패했습니다.", exception);
+		} catch (PortOneException exception) {
+			throw exception;
+		} catch (RestClientException exception) {
+			throw new PortOneException("PortOne 빌링키 삭제 실패: 응답을 해석할 수 없습니다.", exception);
+		}
+	}
+
+	/**
+	 * PortOne V2 빌링키 결제 API를 호출합니다.
+	 */
+	public PortOnePaymentResponse payWithBillingKey(String paymentId, PortOneBillingKeyPaymentRequest request) {
+		try {
+			PortOnePaymentResponse response = restClient.post()
+				.uri("/payments/{paymentId}/billing-key", paymentId)
+				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
+				.body(PortOneBillingKeyPaymentBody.from(properties.storeId(), request))
+				.retrieve()
+				.body(PortOnePaymentResponse.class);
+
+			if (response == null || isBlank(response.id())) {
+				throw new PortOneException("PortOne 빌링키 결제 실패: 결제 응답이 비어 있습니다.");
+			}
+
+			return response;
+		} catch (RestClientResponseException exception) {
+			throw PortOneExceptionConverter.paymentException(exception, "빌링키 결제");
+		} catch (ResourceAccessException exception) {
+			throw new PortOneRetryableException("PortOne 재시도 가능 오류: 빌링키 결제 요청에 실패했습니다.", exception);
+		} catch (PortOneException exception) {
+			throw exception;
+		} catch (RestClientException exception) {
+			throw new PortOneException("PortOne 빌링키 결제 실패: 응답을 해석할 수 없습니다.", exception);
 		}
 	}
 
@@ -166,6 +251,26 @@ public class PortOneClient {
 				request.currentCancellableAmount(),
 				request.reason(),
 				request.requester()
+			);
+		}
+	}
+
+	private record PortOneBillingKeyPaymentBody(
+		String storeId,
+		String billingKey,
+		String orderName,
+		PortOneBillingKeyPaymentRequest.PortOneBillingKeyPaymentAmount amount,
+		String currency,
+		PortOneBillingKeyPaymentRequest.PortOneBillingKeyCustomer customer
+	) {
+		private static PortOneBillingKeyPaymentBody from(String storeId, PortOneBillingKeyPaymentRequest request) {
+			return new PortOneBillingKeyPaymentBody(
+				storeId,
+				request.billingKey(),
+				request.orderName(),
+				request.amount(),
+				request.currency(),
+				request.customer()
 			);
 		}
 	}

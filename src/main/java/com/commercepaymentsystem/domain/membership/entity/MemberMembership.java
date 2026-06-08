@@ -1,6 +1,12 @@
 package com.commercepaymentsystem.domain.membership.entity;
 
+import java.time.LocalDateTime;
+
+import com.commercepaymentsystem.domain.member.entity.Member;
+import com.commercepaymentsystem.domain.membership.exception.MembershipErrorCode;
 import com.commercepaymentsystem.global.entity.BaseEntity;
+import com.commercepaymentsystem.global.exception.BusinessException;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,8 +15,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,8 +31,9 @@ public class MemberMembership extends BaseEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(name = "member_id", nullable = false, unique = true)
-	private Long memberId;
+	@OneToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "member_id", nullable = false, unique = true)
+	private Member member;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "membership_grade_id", nullable = false)
@@ -38,10 +45,57 @@ public class MemberMembership extends BaseEntity {
 	@Column(name = "grade_updated_at")
 	private LocalDateTime gradeUpdatedAt;
 
-	public MemberMembership(Long memberId, MembershipGrade membershipGrade, Long cumulativePaymentAmount) {
-		this.memberId = memberId;
+	public static MemberMembership create(
+		Member member,
+		MembershipGrade membershipGrade
+	) {
+		MemberMembership memberMembership = new MemberMembership(
+			member,
+			membershipGrade
+		);
+
+		memberMembership.cumulativePaymentAmount = 0L;
+		memberMembership.gradeUpdatedAt = LocalDateTime.now();
+
+		return memberMembership;
+	}
+
+	public Long getMemberId() {
+		return member.getId();
+	}
+
+	public void increaseCumulativePaymentAmount(long amount) {
+		this.cumulativePaymentAmount += amount;
+	}
+
+	public void decreaseCumulativePaymentAmount(long amount) {
+		this.cumulativePaymentAmount = Math.max(
+			0L,
+			this.cumulativePaymentAmount - amount
+		);
+	}
+
+	public void changeGrade(MembershipGrade membershipGrade) {
+		if (this.membershipGrade.getId().equals(membershipGrade.getId())) {
+			return;
+		}
+
 		this.membershipGrade = membershipGrade;
-		this.cumulativePaymentAmount = cumulativePaymentAmount;
 		this.gradeUpdatedAt = LocalDateTime.now();
+	}
+
+	public void updateCumulativePaymentAmount(Long amount) {
+		if (amount == null || amount < 0) {
+			throw new BusinessException(
+				MembershipErrorCode.INVALID_CUMULATIVE_PAYMENT_AMOUNT
+			);
+		}
+
+		this.cumulativePaymentAmount = amount;
+	}
+
+	private MemberMembership(Member member, MembershipGrade membershipGrade) {
+		this.member = member;
+		this.membershipGrade = membershipGrade;
 	}
 }
