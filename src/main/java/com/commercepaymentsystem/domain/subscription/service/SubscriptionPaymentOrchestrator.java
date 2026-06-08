@@ -23,12 +23,13 @@ public class SubscriptionPaymentOrchestrator {
 	) {
 		try {
 			return subscriptionPaymentService.pay(
+				billing.portonePaymentId(),
 				billing.billingKey(),
 				billing.billingAmount(),
 				billing.planName()
 			);
 		} catch (Exception e) {
-			return SubscriptionPaymentService.PaymentResult.fail(failureMessagePrefix + ": " + e.getMessage());
+			return SubscriptionPaymentService.PaymentResult.fail(billing.portonePaymentId(), failureMessagePrefix + ": " + e.getMessage());
 		}
 	}
 }

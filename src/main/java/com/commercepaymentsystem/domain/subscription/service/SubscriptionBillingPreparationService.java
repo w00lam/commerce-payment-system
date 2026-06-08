@@ -95,7 +95,8 @@ public class SubscriptionBillingPreparationService {
 			invoice.getId(),
 			paymentMethod.getPortoneBillingKey(),
 			plan.getMonthlyAmount(),
-			plan.getName()
+			plan.getName(),
+			portonePaymentId
 		);
 	}
 
@@ -138,7 +139,8 @@ public class SubscriptionBillingPreparationService {
 			invoice.getId(),
 			paymentMethod.getPortoneBillingKey(),
 			plan.getMonthlyAmount(),
-			plan.getName()
+			plan.getName(),
+			portonePaymentId
 		));
 	}
 

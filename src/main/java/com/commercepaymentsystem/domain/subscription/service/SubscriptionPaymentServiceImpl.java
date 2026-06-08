@@ -22,9 +22,7 @@ public class SubscriptionPaymentServiceImpl implements SubscriptionPaymentServic
 	 * PortOne V2 빌링키 결제 API를 호출하여 실제 결제를 진행합니다.
 	 */
 	@Override
-	public PaymentResult pay(String billingKey, Long amount, String orderName) {
-		String paymentId = "sub-pay-" + UUID.randomUUID();
-
+	public PaymentResult pay(String portonePaymentId, String billingKey, Long amount, String orderName) {
 		PortOneBillingKeyPaymentRequest request = new PortOneBillingKeyPaymentRequest(
 			billingKey,
 			orderName,
@@ -34,11 +32,11 @@ public class SubscriptionPaymentServiceImpl implements SubscriptionPaymentServic
 		);
 
 		try {
-			PortOnePaymentResponse response = portOneClient.payWithBillingKey(paymentId, request);
+			PortOnePaymentResponse response = portOneClient.payWithBillingKey(portonePaymentId, request);
 			return PaymentResult.succeed(response.id());
 		} catch (Exception e) {
-			log.error("PortOne 정기 결제 호출 실패 - paymentId: {}, reason: {}", paymentId, e.getMessage());
-			return PaymentResult.fail(e.getMessage());
+			log.error("PortOne 정기 결제 호출 실패 - paymentId: {}, reason: {}", portonePaymentId, e.getMessage());
+			return PaymentResult.fail(portonePaymentId, e.getMessage());
 		}
 	}
 }

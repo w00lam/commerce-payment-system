@@ -88,13 +88,15 @@ public class SubscriptionInvoice extends BaseEntity {
 		return invoice;
 	}
 
-	public void markAsSucceeded(Long earnedPointAmount, LocalDateTime paidAt) {
+	public void markAsSucceeded(String portonePaymentId, Long earnedPointAmount, LocalDateTime paidAt) {
+		this.portonePaymentId = portonePaymentId;
 		this.status = InvoiceStatus.SUCCEEDED;
 		this.earnedPointAmount = earnedPointAmount;
 		this.paidAt = paidAt;
 	}
 
-	public void markAsFailed(String failureReason) {
+	public void markAsFailed(String portonePaymentId, String failureReason) {
+		this.portonePaymentId = portonePaymentId;
 		this.status = InvoiceStatus.FAILED;
 		this.failureReason = failureReason;
 	}

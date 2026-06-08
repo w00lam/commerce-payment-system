@@ -45,12 +45,14 @@ public class SubscriptionUnpaidRetryScheduler {
 				try {
 					log.info("Retrying billing for failed invoice: {}, subscription: {}", invoice.getId(), subscription.getId());
 					
+					String retryPaymentId = "sub-retry-" + invoice.getId() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
 					PreparedSubscriptionBilling billing = new PreparedSubscriptionBilling(
 						subscription.getId(),
 						invoice.getId(),
 						subscription.getPaymentMethod().getPortoneBillingKey(),
 						invoice.getBillingAmount(),
-						"미납 요금 재청구 - " + invoice.getBillingPeriod()
+						"미납 요금 재청구 - " + invoice.getBillingPeriod(),
+						retryPaymentId
 					);
 
 					var result = paymentOrchestrator.pay(billing, "미납 요금 PG API 호출 중 예외 발생");

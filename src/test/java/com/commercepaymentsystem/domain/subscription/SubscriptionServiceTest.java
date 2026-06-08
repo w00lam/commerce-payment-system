@@ -281,7 +281,7 @@ class SubscriptionServiceTest {
 			"NORMAL",
 			1
 		);
-		failedInvoice.markAsFailed("한도 초과");
+		failedInvoice.markAsFailed("failed-invoice-id", "한도 초과");
 		subscriptionInvoiceRepository.save(failedInvoice);
 
 		// When: 오늘 날짜 기준으로 배치 처리 실행

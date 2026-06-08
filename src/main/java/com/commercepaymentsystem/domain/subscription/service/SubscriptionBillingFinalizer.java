@@ -54,13 +54,13 @@ public class SubscriptionBillingFinalizer {
 		SubscriptionInvoice invoice = getInvoice(billing.invoiceId());
 
 		if (paymentResult.isSuccess()) {
-			completeSuccessfulInvoice(memberId, invoice);
+			completeSuccessfulInvoice(memberId, invoice, paymentResult.getPortonePaymentId());
 			return;
 		}
 
 		subscription.cancel();
 		subscriptionRepository.save(subscription);
-		invoice.markAsFailed(paymentResult.getFailureReason());
+		invoice.markAsFailed(paymentResult.getPortonePaymentId(), paymentResult.getFailureReason());
 		subscriptionInvoiceRepository.save(invoice);
 	}
 
@@ -79,7 +79,7 @@ public class SubscriptionBillingFinalizer {
 		SubscriptionInvoice invoice = getInvoice(billing.invoiceId());
 
 		if (paymentResult.isSuccess()) {
-			completeSuccessfulInvoice(subscription.getMemberId(), invoice);
+			completeSuccessfulInvoice(subscription.getMemberId(), invoice, paymentResult.getPortonePaymentId());
 
 			boolean hasRemainingFailedInvoices = subscriptionInvoiceRepository.existsBySubscriptionIdAndStatus(
 				subscription.getId(),
@@ -93,7 +93,7 @@ public class SubscriptionBillingFinalizer {
 			return;
 		}
 
-		invoice.markAsFailed(paymentResult.getFailureReason());
+		invoice.markAsFailed(paymentResult.getPortonePaymentId(), paymentResult.getFailureReason());
 		subscriptionInvoiceRepository.save(invoice);
 		subscription.markAsUnpaid();
 		subscription.renewNextBillingDate();
@@ -115,12 +115,12 @@ public class SubscriptionBillingFinalizer {
 		SubscriptionInvoice invoice = getInvoice(billing.invoiceId());
 
 		if (!paymentResult.isSuccess()) {
-			invoice.markAsFailed(paymentResult.getFailureReason());
+			invoice.markAsFailed(paymentResult.getPortonePaymentId(), paymentResult.getFailureReason());
 			subscriptionInvoiceRepository.save(invoice);
 			return;
 		}
 
-		completeSuccessfulInvoice(subscription.getMemberId(), invoice);
+		completeSuccessfulInvoice(subscription.getMemberId(), invoice, paymentResult.getPortonePaymentId());
 
 		boolean hasRemainingFailedInvoices = subscriptionInvoiceRepository.existsBySubscriptionIdAndStatus(
 			subscription.getId(),
@@ -132,9 +132,9 @@ public class SubscriptionBillingFinalizer {
 		}
 	}
 
-	private void completeSuccessfulInvoice(Long memberId, SubscriptionInvoice invoice) {
+	private void completeSuccessfulInvoice(Long memberId, SubscriptionInvoice invoice, String portonePaymentId) {
 		long earnedPoints = invoice.getBillingAmount() * invoice.getPointRewardRate() / 100;
-		invoice.markAsSucceeded(earnedPoints, LocalDateTime.now());
+		invoice.markAsSucceeded(portonePaymentId, earnedPoints, LocalDateTime.now());
 		subscriptionInvoiceRepository.save(invoice);
 
 		if (earnedPoints > 0) {

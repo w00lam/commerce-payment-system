@@ -5,6 +5,7 @@ public record PreparedSubscriptionBilling(
 	Long invoiceId,
 	String billingKey,
 	Long billingAmount,
-	String planName
+	String planName,
+	String portonePaymentId
 ) {
 }
