@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 	uniqueConstraints = {
 		@UniqueConstraint(
 			name = "uk_point_history_idempotency",
-			columnNames = {"payment_id", "type", "refund_id"}
+			columnNames = {"payment_id", "type", "refund_id", "source_type"}
 		)
 	}
 )
@@ -39,15 +39,24 @@ public class PointHistory extends BaseEntity {
 	@Column(nullable = false)
 	private Long amount;
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "source_type", nullable = false)
+	private PointSourceType sourceType;
+
 	public PointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
-		this(memberId, paymentId, null, type, amount);
+		this(memberId, paymentId, null, type, amount, PointSourceType.ORDER);
 	}
 
 	public PointHistory(Long memberId, Long paymentId, Long refundId, PointHistoryType type, Long amount) {
+		this(memberId, paymentId, refundId, type, amount, PointSourceType.ORDER);
+	}
+
+	public PointHistory(Long memberId, Long paymentId, Long refundId, PointHistoryType type, Long amount, PointSourceType sourceType) {
 		this.memberId = memberId;
 		this.paymentId = paymentId;
 		this.refundId = refundId;
 		this.type = type;
 		this.amount = amount;
+		this.sourceType = sourceType;
 	}
 }
