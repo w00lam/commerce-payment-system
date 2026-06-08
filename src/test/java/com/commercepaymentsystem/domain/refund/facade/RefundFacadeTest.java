@@ -38,6 +38,7 @@ import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancel
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentCancelResponse;
 import com.commercepaymentsystem.infrastructure.portone.exception.PortOneException;
 import com.commercepaymentsystem.domain.payment.service.PaymentService;
+import com.commercepaymentsystem.domain.payment.port.MembershipPort;
 import com.commercepaymentsystem.domain.refund.service.RefundPostProcessService;
 import com.commercepaymentsystem.domain.refund.service.RefundService;
 
@@ -46,6 +47,7 @@ class RefundFacadeTest {
 	private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 	private final RefundRepository refundRepository = mock(RefundRepository.class);
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
+	private final MembershipPort membershipPort = mock(MembershipPort.class);
 	private final RefundOrderPort refundOrderPort = mock(RefundOrderPort.class);
 	private final RefundPostProcessService refundPostProcessService = mock(RefundPostProcessService.class);
 	private final TransactionOperations transactionOperations = mock(TransactionOperations.class);
@@ -53,7 +55,8 @@ class RefundFacadeTest {
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		null,
-		portOneClient
+		portOneClient,
+		membershipPort
 	);
 
 	private final RefundService refundService = new RefundService(refundRepository);

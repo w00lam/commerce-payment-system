@@ -6,8 +6,8 @@ spring:
     default: local
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/commerce_payment}
-    username: ${DB_USERNAME:root}
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
@@ -45,15 +45,26 @@ server:
   port: 8080
 
 jwt:
-  secret: ${JWT_SECRET:c29tZXRlc3RzZWNyZXRrZXlmb3Jqd3R0b2tlbnByb3ZpZGVyc29tZXRlc3RzZWNyZXRrZXk=}
+  secret: ${JWT_SECRET:}
   expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
 
 portone:
   base-url: "https://api.portone.io"
-  api-secret: ${PORTONE_API_SECRET:test_api_secret}
-  store-id: ${PORTONE_STORE_ID:test_store_id}
-  channel-key: ${PORTONE_CHANNEL_KEY:test_channel_key}
+  api-secret: ${PORTONE_API_SECRET:}
+  store-id: ${PORTONE_STORE_ID:}
+  channel-key: ${PORTONE_CHANNEL_KEY:}
+  billing-channel-key: ${PORTONE_BILLING_CHANNEL_KEY:}
   connect-timeout: ${PORTONE_CONNECT_TIMEOUT:2s}
   read-timeout: ${PORTONE_READ_TIMEOUT:5s}
   webhook:
-    secret: ${PORTONE_WEBHOOK_SECRET:test_webhook_secret}
+    secret: ${PORTONE_WEBHOOK_SECRET:}
+
+subscription:
+  billing:
+    scheduler:
+      page-size: ${SUBSCRIPTION_BILLING_PAGE_SIZE:100}
+    executor:
+      core-pool-size: ${SUBSCRIPTION_BILLING_CORE_POOL_SIZE:10}
+      max-pool-size: ${SUBSCRIPTION_BILLING_MAX_POOL_SIZE:20}
+      queue-capacity: ${SUBSCRIPTION_BILLING_QUEUE_CAPACITY:500}
+      await-termination-seconds: ${SUBSCRIPTION_BILLING_AWAIT_TERMINATION_SECONDS:30}

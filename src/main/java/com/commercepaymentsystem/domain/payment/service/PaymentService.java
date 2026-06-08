@@ -13,6 +13,7 @@ import com.commercepaymentsystem.domain.payment.dto.PaymentCreateResult;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
 import com.commercepaymentsystem.domain.payment.exception.PaymentException;
+import com.commercepaymentsystem.domain.payment.port.MembershipPort;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
 import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
@@ -32,6 +33,7 @@ public class PaymentService {
 	private final PaymentRepository paymentRepository;
 	private final PaymentIdGenerator paymentIdGenerator;
 	private final PortOneClient portOneClient;
+	private final MembershipPort membershipPort;
 
 	/**
 	 * 주문에서 확정된 금액 정보를 기준으로 대기 상태 결제를 생성합니다.
@@ -48,7 +50,8 @@ public class PaymentService {
 			command.orderName(),
 			command.totalOrderAmount(),
 			command.usedPointAmount(),
-			command.finalPaymentAmount()
+			command.finalPaymentAmount(),
+			membershipPort.getPointRewardRate(command.memberId())
 		);
 
 		Payment savedPayment = paymentRepository.save(payment);

@@ -117,18 +117,26 @@ public class PortOneClient {
 	 */
 	public PortOnePaymentResponse payWithBillingKey(String paymentId, PortOneBillingKeyPaymentRequest request) {
 		try {
-			PortOnePaymentResponse response = restClient.post()
+			PayWithBillingKeyResponse response = restClient.post()
 				.uri("/payments/{paymentId}/billing-key", paymentId)
 				.header(HttpHeaders.AUTHORIZATION, authorizationHeader())
-				.body(PortOneBillingKeyPaymentBody.from(properties.storeId(), request))
+				.body(PortOneBillingKeyPaymentBody.from(properties.storeId(), properties.billingChannelKey(), request))
 				.retrieve()
-				.body(PortOnePaymentResponse.class);
+				.body(PayWithBillingKeyResponse.class);
 
-			if (response == null || isBlank(response.id())) {
+			if (response == null || response.payment() == null || isBlank(response.payment().pgTxId())) {
 				throw new PortOneException("PortOne 빌링키 결제 실패: 결제 응답이 비어 있습니다.");
 			}
 
-			return response;
+			return new PortOnePaymentResponse(
+				paymentId,
+				"PAID",
+				response.payment().pgTxId(),
+				request.orderName(),
+				new PortOnePaymentResponse.PortOnePaymentAmount(request.amount().total()),
+				response.payment().paidAt(),
+				null
+			);
 		} catch (RestClientResponseException exception) {
 			throw PortOneExceptionConverter.paymentException(exception, "빌링키 결제");
 		} catch (ResourceAccessException exception) {
@@ -257,15 +265,21 @@ public class PortOneClient {
 
 	private record PortOneBillingKeyPaymentBody(
 		String storeId,
+		String channelKey,
 		String billingKey,
 		String orderName,
 		PortOneBillingKeyPaymentRequest.PortOneBillingKeyPaymentAmount amount,
 		String currency,
 		PortOneBillingKeyPaymentRequest.PortOneBillingKeyCustomer customer
 	) {
-		private static PortOneBillingKeyPaymentBody from(String storeId, PortOneBillingKeyPaymentRequest request) {
+		private static PortOneBillingKeyPaymentBody from(
+			String storeId,
+			String channelKey,
+			PortOneBillingKeyPaymentRequest request
+		) {
 			return new PortOneBillingKeyPaymentBody(
 				storeId,
+				channelKey,
 				request.billingKey(),
 				request.orderName(),
 				request.amount(),
@@ -273,5 +287,16 @@ public class PortOneClient {
 				request.customer()
 			);
 		}
+	}
+
+	private record PayWithBillingKeyResponse(
+		BillingKeyPaymentSummary payment
+	) {
+	}
+
+	private record BillingKeyPaymentSummary(
+		String pgTxId,
+		java.time.Instant paidAt
+	) {
 	}
 }

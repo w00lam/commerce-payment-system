@@ -10,6 +10,7 @@ public record PortOneProperties(
 	String apiSecret,
 	String storeId,
 	String channelKey,
+	String billingChannelKey,
 	Duration connectTimeout,
 	Duration readTimeout
 ) {
@@ -21,6 +22,9 @@ public record PortOneProperties(
 	public PortOneProperties {
 		if (isBlank(baseUrl)) {
 			baseUrl = DEFAULT_BASE_URL;
+		}
+		if (isBlank(billingChannelKey)) {
+			billingChannelKey = channelKey;
 		}
 		if (connectTimeout == null) {
 			connectTimeout = DEFAULT_CONNECT_TIMEOUT;

@@ -43,6 +43,7 @@ class PortOneClientTest {
 			"test-api-secret",
 			"test-store-id",
 			"test-channel-key",
+			"test-billing-channel-key",
 			Duration.ofSeconds(1),
 			Duration.ofSeconds(3)
 		);
@@ -207,7 +208,30 @@ class PortOneClientTest {
 				  "pgMessage": "already cancelled"
 				}
 				"""
-			);
+		);
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("결제 취소 실패 응답의 이스케이프 문자열을 JSON으로 파싱한다")
+	void cancelPayment_pgRejectionWithEscapedMessage_fail() {
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/cancel"))
+			.andRespond(withBadRequest().body("""
+				{
+				  "type": "PgProviderError",
+				  "message": "PG rejected \\"cancel\\" request",
+				  "pgCode": "DUPLICATED_CANCEL",
+				  "pgMessage": "already cancelled"
+				}
+				""").contentType(APPLICATION_JSON));
+
+		assertThatThrownBy(() -> portOneClient.cancelPayment(
+			"payment-123",
+			new PortOnePaymentCancelRequest(5_000L, 0L, 10_000L, "customer-request", "CUSTOMER")
+		))
+			.isInstanceOf(PortOneException.class)
+			.extracting("portOneMessage")
+			.isEqualTo("PG rejected \"cancel\" request");
 		server.verify();
 	}
 
@@ -305,6 +329,7 @@ class PortOneClientTest {
 			.andExpect(content().json("""
 				{
 				  "storeId": "test-store-id",
+				  "channelKey": "test-billing-channel-key",
 				  "billingKey": "billing-key-123",
 				  "orderName": "Monthly Subscription",
 				  "amount": { "total": 10000 },
@@ -313,9 +338,10 @@ class PortOneClientTest {
 				"""))
 			.andRespond(withSuccess("""
 				{
-				  "id": "payment-123",
-				  "status": "PAID",
-				  "amount": { "total": 10000 }
+				  "payment": {
+				    "pgTxId": "pg-tx-123",
+				    "paidAt": "2026-06-01T01:02:03Z"
+				  }
 				}
 				""", APPLICATION_JSON));
 
@@ -331,6 +357,8 @@ class PortOneClientTest {
 
 		assertThat(response.id()).isEqualTo("payment-123");
 		assertThat(response.status()).isEqualTo("PAID");
+		assertThat(response.transactionId()).isEqualTo("pg-tx-123");
+		assertThat(response.paidAt()).isEqualTo(Instant.parse("2026-06-01T01:02:03Z"));
 		server.verify();
 	}
 }

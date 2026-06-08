@@ -37,6 +37,7 @@ import com.commercepaymentsystem.domain.product.entity.ProductStatus;
 import com.commercepaymentsystem.domain.product.exception.ProductErrorCode;
 import com.commercepaymentsystem.domain.product.service.ProductService;
 import com.commercepaymentsystem.global.exception.BusinessException;
+import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +54,7 @@ public class OrderFacade {
 	private final ProductService productService;
 
 	public OrderPreviewResponse previewOrder(Long memberId, OrderPreviewRequest request) {
-		List<Long> cartItemIds = request.cartItemIds();
+		List<Long> cartItemIds = request != null ? request.cartItemIds() : List.of();
 		List<CartItem> cartItems = getPreviewCartItems(
 			memberId,
 			cartItemIds != null ? cartItemIds : List.of()
@@ -93,11 +94,21 @@ public class OrderFacade {
 		return new OrderPreviewResponse(memberId, totalPrice, items);
 	}
 
+	/**
+	 * 장바구니 항목으로 주문과 결제 대기 건을 생성합니다.
+	 *
+	 * <p>포인트 사용 금액은 회원 row를 비관적 락으로 조회한 뒤 검증해, 동시에 여러 주문이
+	 * 같은 포인트 잔액을 초과 사용하지 못하게 합니다.</p>
+	 */
 	@Transactional
 	public OrderCreateResponse createOrder(Long memberId, OrderCreateRequest request) {
-		List<Long> cartItemIds = (request != null) ? request.cartItemIds() : List.of();
+		if (request == null) {
+			throw new BusinessException(GlobalErrorCode.INVALID_INPUT_VALUE);
+		}
 
-		Member member = memberService.getMember(memberId);
+		List<Long> cartItemIds = request.cartItemIds();
+
+		Member member = memberService.getMemberForUpdate(memberId);
 		long usedPointAmount = request.safeUsedPointAmount();
 		if (member.getPointBalance() < usedPointAmount) {
 			throw new BusinessException(MemberErrorCode.POINT_NOT_ENOUGH, "포인트 잔액이 부족합니다.");

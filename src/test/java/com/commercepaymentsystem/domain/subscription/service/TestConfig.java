@@ -20,13 +20,14 @@ public class TestConfig {
 		SubscriptionPaymentService mockService = Mockito.mock(SubscriptionPaymentService.class);
 		
 		// 기본적으로 성공 응답 반환
-		when(mockService.pay(anyString(), any(), anyString()))
+		when(mockService.pay(anyString(), anyString(), any(), anyString()))
 			.thenAnswer(invocation -> {
-				String billingKey = invocation.getArgument(0);
+				String portonePaymentId = invocation.getArgument(0);
+				String billingKey = invocation.getArgument(1);
 				if ("FAIL_KEY".equals(billingKey)) {
-					return SubscriptionPaymentService.PaymentResult.fail("한도 초과");
+					return SubscriptionPaymentService.PaymentResult.fail(portonePaymentId, "한도 초과");
 				}
-				return SubscriptionPaymentService.PaymentResult.succeed("test-payment-id");
+				return SubscriptionPaymentService.PaymentResult.succeed(portonePaymentId);
 			});
 			
 		return mockService;

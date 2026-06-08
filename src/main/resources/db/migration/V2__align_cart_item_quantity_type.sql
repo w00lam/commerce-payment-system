@@ -1,2 +1,0 @@
-ALTER TABLE cart_items
-    MODIFY COLUMN quantity BIGINT NOT NULL;

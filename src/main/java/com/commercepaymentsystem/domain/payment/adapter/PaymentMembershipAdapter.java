@@ -14,6 +14,11 @@ public class PaymentMembershipAdapter implements MembershipPort {
 	private final MembershipService membershipService;
 
 	@Override
+	public int getPointRewardRate(Long memberId) {
+		return membershipService.getPointRewardRate(memberId);
+	}
+
+	@Override
 	public void applyPayment(Long memberId, Long paidAmount) {
 		membershipService.applyPayment(memberId, paidAmount);
 	}

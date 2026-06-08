@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -25,15 +26,18 @@ public class SubscriptionScheduler {
 	private final SubscriptionRepository subscriptionRepository;
 	private final SubscriptionService subscriptionService;
 	private final ThreadPoolTaskExecutor executor;
+	private final int pageSize;
 
 	public SubscriptionScheduler(
 		SubscriptionRepository subscriptionRepository,
 		SubscriptionService subscriptionService,
-		@org.springframework.beans.factory.annotation.Qualifier("subscriptionBillingExecutor") ThreadPoolTaskExecutor executor
+		@org.springframework.beans.factory.annotation.Qualifier("subscriptionBillingExecutor") ThreadPoolTaskExecutor executor,
+		@Value("${subscription.billing.scheduler.page-size:100}") int pageSize
 	) {
 		this.subscriptionRepository = subscriptionRepository;
 		this.subscriptionService = subscriptionService;
 		this.executor = executor;
+		this.pageSize = pageSize;
 	}
 
 	/**
@@ -45,7 +49,6 @@ public class SubscriptionScheduler {
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 		log.info("Starting regular subscription billing scheduler for date: {}", today);
 
-		int pageSize = 100;
 		Long lastId = 0L;
 		boolean hasNext = true;
 		long totalProcessed = 0;
