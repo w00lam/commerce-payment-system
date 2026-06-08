@@ -46,6 +46,10 @@ public class MembershipService {
 			.toList();
 	}
 
+	public int getPointRewardRate(Long memberId) {
+		return getMembership(memberId).getMembershipGrade().getPointRewardRate();
+	}
+
 	@Transactional
 	public void applyPayment(
 		Long memberId,

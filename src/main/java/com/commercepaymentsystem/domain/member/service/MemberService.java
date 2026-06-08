@@ -26,6 +26,15 @@ public class MemberService {
 	}
 
 	/**
+	 * 포인트 잔액 검증/차감처럼 회원 row의 동시 변경을 막아야 하는 흐름에서 사용하는 잠금 조회입니다.
+	 */
+	@Transactional
+	public Member getMemberForUpdate(Long memberId) {
+		return memberRepository.findByIdWithPessimisticLock(memberId)
+			.orElseThrow(() -> new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+	}
+
+	/**
 	 * 인증된 회원의 탈퇴 요청을 처리합니다.
 	 *
 	 * JWT에서 추출한 memberId로 회원을 조회한 뒤, 요청 비밀번호와 저장된 암호화 비밀번호를 검증합니다.
