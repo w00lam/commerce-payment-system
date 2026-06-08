@@ -26,18 +26,14 @@ public class SubscriptionScheduler {
 	private final SubscriptionService subscriptionService;
 	private final ThreadPoolTaskExecutor executor;
 
-	public SubscriptionScheduler(SubscriptionRepository subscriptionRepository, SubscriptionService subscriptionService) {
+	public SubscriptionScheduler(
+		SubscriptionRepository subscriptionRepository,
+		SubscriptionService subscriptionService,
+		@org.springframework.beans.factory.annotation.Qualifier("subscriptionBillingExecutor") ThreadPoolTaskExecutor executor
+	) {
 		this.subscriptionRepository = subscriptionRepository;
 		this.subscriptionService = subscriptionService;
-
-		this.executor = new ThreadPoolTaskExecutor();
-		this.executor.setCorePoolSize(10);
-		this.executor.setMaxPoolSize(20);
-		this.executor.setQueueCapacity(500);
-		this.executor.setThreadNamePrefix("sub-billing-");
-		this.executor.setWaitForTasksToCompleteOnShutdown(true);
-		this.executor.setAwaitTerminationSeconds(30);
-		this.executor.initialize();
+		this.executor = executor;
 	}
 
 	/**

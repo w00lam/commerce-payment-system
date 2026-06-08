@@ -23,7 +23,7 @@ public class SubscriptionPaymentServiceImpl implements SubscriptionPaymentServic
 	 */
 	@Override
 	public PaymentResult pay(String billingKey, Long amount, String orderName) {
-		String paymentId = "sub-pay-" + UUID.randomUUID().toString().substring(0, 8);
+		String paymentId = "sub-pay-" + UUID.randomUUID();
 
 		PortOneBillingKeyPaymentRequest request = new PortOneBillingKeyPaymentRequest(
 			billingKey,
