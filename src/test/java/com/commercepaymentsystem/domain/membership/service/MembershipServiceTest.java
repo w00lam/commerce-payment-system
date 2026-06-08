@@ -157,6 +157,19 @@ class MembershipServiceTest {
 			.containsExactly("NORMAL", "VIP");
 	}
 
+	@Test
+	@DisplayName("현재 멤버십 등급의 포인트 적립률을 반환한다")
+	void getPointRewardRate_returnsCurrentGradeRewardRate() {
+		MembershipGrade vip = grade(2L, "VIP", 50_000L, 5);
+		MemberMembership membership = membership(vip, 50_000L);
+		when(memberMembershipRepository.findByMemberId(1L))
+			.thenReturn(Optional.of(membership));
+
+		int rewardRate = membershipService.getPointRewardRate(1L);
+
+		assertThat(rewardRate).isEqualTo(5);
+	}
+
 	private MemberMembership membership(MembershipGrade grade, Long cumulativePaymentAmount) {
 		Member member = Member.create(
 			"user@example.com",

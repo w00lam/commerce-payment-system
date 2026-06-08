@@ -2,6 +2,10 @@ package com.commercepaymentsystem.domain.subscription;
 
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.domain.membership.entity.MemberMembership;
+import com.commercepaymentsystem.domain.membership.entity.MembershipGrade;
+import com.commercepaymentsystem.domain.membership.repository.MemberMembershipRepository;
+import com.commercepaymentsystem.domain.membership.repository.MembershipGradeRepository;
 import com.commercepaymentsystem.domain.subscription.dto.RegisterPaymentMethodRequest;
 import com.commercepaymentsystem.domain.subscription.dto.StartSubscriptionRequest;
 import com.commercepaymentsystem.domain.subscription.dto.SubscriptionResponse;
@@ -56,9 +60,13 @@ class SubscriptionServiceTest {
 	private com.commercepaymentsystem.domain.point.repository.PointHistoryRepository pointHistoryRepository;
 
 	@Autowired
-	private com.commercepaymentsystem.domain.membership.repository.MemberMembershipRepository memberMembershipRepository;
+	private MemberMembershipRepository memberMembershipRepository;
+
+	@Autowired
+	private MembershipGradeRepository membershipGradeRepository;
 
 	private Member member;
+	private MembershipGrade vipGrade;
 	private Plan basicPlan;
 	private PaymentMethod successPaymentMethod;
 	private PaymentMethod failPaymentMethod;
@@ -70,6 +78,7 @@ class SubscriptionServiceTest {
 		paymentMethodRepository.deleteAllInBatch();
 		memberMembershipRepository.deleteAllInBatch();
 		pointHistoryRepository.deleteAllInBatch();
+		membershipGradeRepository.deleteAllInBatch();
 		planRepository.deleteAllInBatch();
 		memberRepository.deleteAllInBatch();
 	}
@@ -82,6 +91,9 @@ class SubscriptionServiceTest {
 			"Hong Gil Dong",
 			"010-1234-5678"
 		));
+		MembershipGrade normalGrade = membershipGradeRepository.save(MembershipGrade.create("NORMAL", 0L, 1));
+		vipGrade = membershipGradeRepository.save(MembershipGrade.create("VIP", 50_000L, 5));
+		memberMembershipRepository.save(MemberMembership.create(member, normalGrade));
 
 		basicPlan = planRepository.save(new Plan("Test Basic Plan", 10000L, "Test Basic"));
 
@@ -144,6 +156,26 @@ class SubscriptionServiceTest {
 		// 포인트 적립 연동 검증 (기본 NORMAL 등급 1% 적립 = 100 포인트)
 		Member updatedMember = memberRepository.findById(member.getId()).orElseThrow();
 		assertThat(updatedMember.getPointBalance()).isEqualTo(100L);
+	}
+
+	@Test
+	void startSubscription_UsesMembershipSnapshotBeforePayment() {
+		MemberMembership membership = memberMembershipRepository.findByMemberId(member.getId()).orElseThrow();
+		membership.updateCumulativePaymentAmount(50_000L);
+		membership.changeGrade(vipGrade);
+		memberMembershipRepository.save(membership);
+
+		StartSubscriptionRequest request = new StartSubscriptionRequest(basicPlan.getId(), successPaymentMethod.getId());
+		SubscriptionResponse response = subscriptionService.startSubscription(member.getId(), request);
+
+		List<SubscriptionInvoice> invoices = subscriptionInvoiceRepository.findAllBySubscriptionId(response.getId());
+		assertThat(invoices).hasSize(1);
+		assertThat(invoices.get(0).getMembershipGradeName()).isEqualTo("VIP");
+		assertThat(invoices.get(0).getPointRewardRate()).isEqualTo(5);
+		assertThat(invoices.get(0).getEarnedPointAmount()).isEqualTo(500L);
+
+		Member updatedMember = memberRepository.findById(member.getId()).orElseThrow();
+		assertThat(updatedMember.getPointBalance()).isEqualTo(500L);
 	}
 
 	@Test

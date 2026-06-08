@@ -20,6 +20,10 @@ import com.commercepaymentsystem.domain.cart.repository.CartItemRepository;
 import com.commercepaymentsystem.domain.cart.repository.CartRepository;
 import com.commercepaymentsystem.domain.member.entity.Member;
 import com.commercepaymentsystem.domain.member.repository.MemberRepository;
+import com.commercepaymentsystem.domain.membership.entity.MemberMembership;
+import com.commercepaymentsystem.domain.membership.entity.MembershipGrade;
+import com.commercepaymentsystem.domain.membership.repository.MemberMembershipRepository;
+import com.commercepaymentsystem.domain.membership.repository.MembershipGradeRepository;
 import com.commercepaymentsystem.domain.order.entity.Order;
 import com.commercepaymentsystem.domain.order.entity.OrderStatus;
 import com.commercepaymentsystem.domain.order.repository.OrderRepository;
@@ -75,6 +79,12 @@ class PaymentPostProcessIntegrationTest {
 	private MemberRepository memberRepository;
 
 	@Autowired
+	private MemberMembershipRepository memberMembershipRepository;
+
+	@Autowired
+	private MembershipGradeRepository membershipGradeRepository;
+
+	@Autowired
 	private ProductRepository productRepository;
 
 	@Autowired
@@ -101,7 +111,7 @@ class PaymentPostProcessIntegrationTest {
 	@Test
 	@DisplayName("Payment confirmation updates order, points, and ordered cart items")
 	void confirmPayment_postProcess_success() {
-		Member member = memberRepository.save(member());
+		Member member = saveMemberWithDefaultMembership();
 		member.addPoint(5_000L);
 
 		Product orderedProduct = productRepository.save(product("Keyboard", 10_000L));
@@ -151,7 +161,7 @@ class PaymentPostProcessIntegrationTest {
 	@Test
 	@DisplayName("Point-only payment confirmation skips PortOne and deducts points")
 	void confirmPayment_pointOnlyPostProcess_success() {
-		Member member = memberRepository.save(member());
+		Member member = saveMemberWithDefaultMembership();
 		member.addPoint(10_000L);
 
 		Product orderedProduct = productRepository.save(product("Keyboard", 10_000L));
@@ -188,7 +198,7 @@ class PaymentPostProcessIntegrationTest {
 	@Test
 	@DisplayName("Point-only payment refund restores used points without PortOne cancellation")
 	void refundPayment_pointOnlyPostProcess_success() {
-		Member member = memberRepository.save(member());
+		Member member = saveMemberWithDefaultMembership();
 		member.addPoint(10_000L);
 
 		Product orderedProduct = productRepository.save(product("Keyboard", 10_000L));
@@ -233,7 +243,7 @@ class PaymentPostProcessIntegrationTest {
 	@Test
 	@DisplayName("Point-only quantity partial refund restores partial points without cancelling order")
 	void refundPayment_pointOnlyPartialPostProcess_success() {
-		Member member = memberRepository.save(member());
+		Member member = saveMemberWithDefaultMembership();
 		member.addPoint(20_000L);
 
 		Product keyboard = productRepository.save(product("Keyboard", 10_000L));
@@ -282,6 +292,13 @@ class PaymentPostProcessIntegrationTest {
 			"member",
 			"01012345678"
 		);
+	}
+
+	private Member saveMemberWithDefaultMembership() {
+		Member savedMember = memberRepository.save(member());
+		MembershipGrade normalGrade = membershipGradeRepository.save(MembershipGrade.create("NORMAL", 0L, 1));
+		memberMembershipRepository.save(MemberMembership.create(savedMember, normalGrade));
+		return savedMember;
 	}
 
 	private Product product(String name, Long price) {
