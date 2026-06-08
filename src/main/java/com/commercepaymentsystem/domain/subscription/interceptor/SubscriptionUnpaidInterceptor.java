@@ -23,8 +23,8 @@ public class SubscriptionUnpaidInterceptor implements HandlerInterceptor {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		
 		if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
-			// SecurityConfig에서 memberId를 name으로 저장한다고 가정 (일반적인 JWT 설정)
-			Long memberId = Long.parseLong(authentication.getName());
+			// JwtAuthFilter에서 principal 객체 자체에 Long 타입의 memberId를 세팅하므로 직접 캐스팅
+			Long memberId = (Long) authentication.getPrincipal();
 
 			if (subscriptionRepository.existsByMemberIdAndStatusAndUnpaidTrue(memberId, SubscriptionStatus.ACTIVE)) {
 				throw new SubscriptionException(SubscriptionErrorCode.UNPAID_SUBSCRIPTION);

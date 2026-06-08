@@ -35,4 +35,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 	Optional<Subscription> findByIdWithPessimisticLock(@Param("id") Long id);
 
 	boolean existsByMemberIdAndStatusAndUnpaidTrue(Long memberId, SubscriptionStatus status);
+
+	@Query("select s from Subscription s join fetch s.paymentMethod where s.status = :status and s.unpaid = true")
+	List<Subscription> findAllByStatusAndUnpaidTrueWithPaymentMethod(@Param("status") SubscriptionStatus status);
 }

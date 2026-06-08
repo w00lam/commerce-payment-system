@@ -37,10 +37,8 @@ public class SubscriptionUnpaidRetryScheduler {
 	public void retryUnpaidBilling() {
 		log.info("Starting unpaid subscription billing retry...");
 		
-		// 미납 상태인 모든 활성 구독 조회 (실무에선 Slice/Page 처리가 필요하나 우선 간단히 구현)
-		List<Subscription> unpaidSubscriptions = subscriptionRepository.findAll().stream()
-			.filter(s -> s.isUnpaid() && s.getStatus() == SubscriptionStatus.ACTIVE)
-			.toList();
+		// 미납 상태인 모든 활성 구독과 결제 수단(PaymentMethod)을 JOIN FETCH로 한 번에 조회 (N+1 및 LazyInitializationException 방지)
+		List<Subscription> unpaidSubscriptions = subscriptionRepository.findAllByStatusAndUnpaidTrueWithPaymentMethod(SubscriptionStatus.ACTIVE);
 
 		for (Subscription subscription : unpaidSubscriptions) {
 			List<SubscriptionInvoice> failedInvoices = subscriptionInvoiceRepository.findAllBySubscriptionIdAndStatus(subscription.getId(), InvoiceStatus.FAILED);
