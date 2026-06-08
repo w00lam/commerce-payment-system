@@ -26,7 +26,7 @@ public class MembershipGrade extends BaseEntity {
 	private Long id;
 
 	@NonNull
-	@Column(nullable = false, unique = true, length = 30)
+	@Column(nullable = false, unique = true, length = 50)
 	private String name;
 
 	@NonNull

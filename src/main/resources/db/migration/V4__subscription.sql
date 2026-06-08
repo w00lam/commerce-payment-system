@@ -72,23 +72,14 @@ CREATE TABLE subscription_invoices (
     CONSTRAINT fk_subscription_invoices_subscription FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
 );
 
-INSERT INTO membership_grades (
-    name,
-    min_cumulative_payment_amount,
-    point_reward_rate,
-    created_at,
-    updated_at
-) VALUES
-    ('NORMAL', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('VIP', 50000, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('VVIP', 100000, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+-- Seed initial data
+INSERT INTO membership_grades (name, min_cumulative_payment_amount, point_reward_rate, created_at, updated_at)
+VALUES 
+('NORMAL', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('VIP', 50000, 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('VVIP', 100000, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
-INSERT INTO plans (
-    name,
-    monthly_amount,
-    description,
-    created_at,
-    updated_at
-) VALUES
-    ('Basic Plan', 9900, 'Basic subscription plan', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('Premium Plan', 19900, 'Premium subscription plan', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO plans (name, monthly_amount, description, created_at, updated_at)
+VALUES
+('Basic Plan', 9900, '기본 요금제', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Premium Plan', 19900, '프리미엄 요금제', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

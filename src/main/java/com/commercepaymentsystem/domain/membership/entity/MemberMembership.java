@@ -20,26 +20,21 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 
 @Entity
 @Getter
 @Table(name = "member_memberships")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class MemberMembership extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@NonNull
 	@OneToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "member_id", nullable = false, unique = true)
 	private Member member;
 
-	@NonNull
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "membership_grade_id", nullable = false)
 	private MembershipGrade membershipGrade;
@@ -69,11 +64,11 @@ public class MemberMembership extends BaseEntity {
 		return member.getId();
 	}
 
-	public void increaseCumulativePaymentAmount(Long amount) {
+	public void increaseCumulativePaymentAmount(long amount) {
 		this.cumulativePaymentAmount += amount;
 	}
 
-	public void decreaseCumulativePaymentAmount(Long amount) {
+	public void decreaseCumulativePaymentAmount(long amount) {
 		this.cumulativePaymentAmount = Math.max(
 			0L,
 			this.cumulativePaymentAmount - amount
@@ -97,5 +92,10 @@ public class MemberMembership extends BaseEntity {
 		}
 
 		this.cumulativePaymentAmount = amount;
+	}
+
+	private MemberMembership(Member member, MembershipGrade membershipGrade) {
+		this.member = member;
+		this.membershipGrade = membershipGrade;
 	}
 }

@@ -11,21 +11,21 @@ import com.commercepaymentsystem.domain.membership.entity.MemberMembership;
 
 import jakarta.persistence.LockModeType;
 
-public interface MemberMembershipRepository	extends JpaRepository<MemberMembership, Long> {
+public interface MemberMembershipRepository extends JpaRepository<MemberMembership, Long> {
 
 	@Query("""
-            select mm
-            from MemberMembership mm
-            where mm.member.id = :memberId
-            """)
+		select mm
+		from MemberMembership mm
+		where mm.member.id = :memberId
+		""")
 	Optional<MemberMembership> findByMemberId(Long memberId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
-            select mm
-            from MemberMembership mm
-            where mm.member.id = :memberId
-            """)
+		select mm
+		from MemberMembership mm
+		where mm.member.id = :memberId
+		""")
 	Optional<MemberMembership> findByMemberIdForUpdate(
 		@Param("memberId") Long memberId
 	);
