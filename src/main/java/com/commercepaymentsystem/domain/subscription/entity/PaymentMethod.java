@@ -35,4 +35,21 @@ public class PaymentMethod extends BaseEntity {
 		this.portoneBillingKey = portoneBillingKey;
 		this.cardCompanyName = cardCompanyName;
 	}
+
+	public String getMaskedBillingKey() {
+		if (this.portoneBillingKey == null || this.portoneBillingKey.length() < 8) {
+			return "****";
+		}
+		return this.portoneBillingKey.substring(0, 4) + "****" + this.portoneBillingKey.substring(this.portoneBillingKey.length() - 4);
+	}
+
+	@Override
+	public String toString() {
+		return "PaymentMethod{" +
+			"id=" + id +
+			", memberId=" + memberId +
+			", cardCompanyName='" + cardCompanyName + '\'' +
+			", portoneBillingKey='" + getMaskedBillingKey() + '\'' +
+			'}';
+	}
 }

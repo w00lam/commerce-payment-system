@@ -55,6 +55,9 @@ public class Subscription extends BaseEntity {
 	@Column(name = "cancelled_at")
 	private LocalDateTime cancelledAt;
 
+	@Column(name = "is_unpaid", nullable = false)
+	private boolean unpaid = false;
+
 	public static Subscription create(Long memberId, Plan plan, PaymentMethod paymentMethod) {
 		Subscription subscription = new Subscription();
 		subscription.memberId = memberId;
@@ -98,5 +101,13 @@ public class Subscription extends BaseEntity {
 		this.status = SubscriptionStatus.CANCELLED;
 		this.activePlanKey = null;
 		this.cancelledAt = LocalDateTime.now();
+	}
+
+	public void markAsUnpaid() {
+		this.unpaid = true;
+	}
+
+	public void clearUnpaid() {
+		this.unpaid = false;
 	}
 }

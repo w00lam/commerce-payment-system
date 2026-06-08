@@ -311,15 +311,13 @@ public class SubscriptionService {
 				Optional<SubscriptionInvoice> existingInvoice = subscriptionInvoiceRepository.findBySubscriptionIdAndBillingPeriod(subscription.getId(), billingPeriod);
 				if (existingInvoice.isPresent()) {
 					if (existingInvoice.get().getStatus() == InvoiceStatus.FAILED) {
-						// 실제 청구 주기에 결제 시도 실패 기록이 있는 경우에만 미납 정지/해지 처리 즉시 반영
-						subscription.cancel();
-						subscriptionRepository.save(subscription);
-						return PrepareBillingResult.cancelled();
+						// 발제문 정책: 정기 결제 실패 시에도 구독 상태를 유지함. 
+						// 필요 시 여기서 재시도 횟수 제한 등의 미납 정책을 추가할 수 있으나, 현재는 즉시 해지를 방지함.
+						// return PrepareBillingResult.cancelled(); // 기존의 즉시 해지 로직 주석 처리
 					}
 					// 이미 성공했거나 대기 중인 경우 스킵
 					return PrepareBillingResult.skipped();
 				}
-				// 결제 시도 이력이 없는 경우, 즉시 해지하지 않고 결제 시도를 먼저 선행하도록 대기 (fall-through)
 			} else {
 				// 오늘이 결제 예정일인 경우 중복 결제 방지
 				if (subscriptionInvoiceRepository.existsBySubscriptionIdAndBillingPeriod(subscription.getId(), billingPeriod)) {
@@ -392,11 +390,17 @@ public class SubscriptionService {
 					pointService.earnPoint(subscription.getMemberId(), earnedPoints, invoice.getId(), PointSourceType.SUBSCRIPTION);
 				}
 
+				subscription.clearUnpaid();
 				subscription.renewNextBillingDate();
 				subscriptionRepository.save(subscription);
 			} else {
 				invoice.markAsFailed(finalPaymentResult.getFailureReason());
 				subscriptionInvoiceRepository.save(invoice);
+
+				// 발제문 정책 보완: 실패 시에도 다음 결제일로 넘기되 미납 상태로 전환
+				subscription.markAsUnpaid();
+				subscription.renewNextBillingDate();
+				subscriptionRepository.save(subscription);
 			}
 		});
 	}
