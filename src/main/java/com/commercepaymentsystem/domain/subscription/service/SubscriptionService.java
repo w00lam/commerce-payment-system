@@ -390,7 +390,11 @@ public class SubscriptionService {
 					pointService.earnPoint(subscription.getMemberId(), earnedPoints, invoice.getId(), PointSourceType.SUBSCRIPTION);
 				}
 
-				subscription.clearUnpaid();
+				// 모든 미납 인보이스가 해결되었는지 확인
+				boolean hasRemainingFailedInvoices = subscriptionInvoiceRepository.existsBySubscriptionIdAndStatus(subscription.getId(), InvoiceStatus.FAILED);
+				if (!hasRemainingFailedInvoices) {
+					subscription.clearUnpaid();
+				}
 				subscription.renewNextBillingDate();
 				subscriptionRepository.save(subscription);
 			} else {

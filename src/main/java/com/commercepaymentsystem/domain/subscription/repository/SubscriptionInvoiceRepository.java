@@ -1,5 +1,6 @@
 package com.commercepaymentsystem.domain.subscription.repository;
 
+import com.commercepaymentsystem.domain.subscription.entity.InvoiceStatus;
 import com.commercepaymentsystem.domain.subscription.entity.SubscriptionInvoice;
 import java.util.List;
 import java.util.Optional;
@@ -9,4 +10,6 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
 	List<SubscriptionInvoice> findAllBySubscriptionId(Long subscriptionId);
 	boolean existsBySubscriptionIdAndBillingPeriod(Long subscriptionId, String billingPeriod);
 	Optional<SubscriptionInvoice> findBySubscriptionIdAndBillingPeriod(Long subscriptionId, String billingPeriod);
+	List<SubscriptionInvoice> findAllBySubscriptionIdAndStatus(Long subscriptionId, InvoiceStatus status);
+	boolean existsBySubscriptionIdAndStatus(Long subscriptionId, InvoiceStatus status);
 }
