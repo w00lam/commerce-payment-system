@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -19,7 +20,15 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "subscription_invoices")
+@Table(
+	name = "subscription_invoices",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_subscription_invoices_subscription_billing_period",
+			columnNames = {"subscription_id", "billing_period"}
+		)
+	}
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SubscriptionInvoice extends BaseEntity {
 

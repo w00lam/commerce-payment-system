@@ -80,7 +80,8 @@ public class Payment extends BaseEntity {
 		String orderName,
 		Long totalOrderAmount,
 		Long usedPointAmount,
-		Long finalPaymentAmount
+		Long finalPaymentAmount,
+		Integer pointRewardRate
 	) {
 		return new Payment(
 			paymentId,
@@ -90,8 +91,29 @@ public class Payment extends BaseEntity {
 			totalOrderAmount,
 			usedPointAmount,
 			finalPaymentAmount,
-			calculateEarnedPointAmount(finalPaymentAmount),
+			calculateEarnedPointAmount(finalPaymentAmount, pointRewardRate),
 			PaymentStatus.PENDING
+		);
+	}
+
+	public static Payment create(
+		String paymentId,
+		Long memberId,
+		Long orderId,
+		String orderName,
+		Long totalOrderAmount,
+		Long usedPointAmount,
+		Long finalPaymentAmount
+	) {
+		return create(
+			paymentId,
+			memberId,
+			orderId,
+			orderName,
+			totalOrderAmount,
+			usedPointAmount,
+			finalPaymentAmount,
+			1
 		);
 	}
 
@@ -114,12 +136,12 @@ public class Payment extends BaseEntity {
 		);
 	}
 
-	private static Long calculateEarnedPointAmount(Long finalPaymentAmount) {
-		if (finalPaymentAmount == null || finalPaymentAmount <= 0) {
+	private static Long calculateEarnedPointAmount(Long finalPaymentAmount, Integer pointRewardRate) {
+		if (finalPaymentAmount == null || finalPaymentAmount <= 0 || pointRewardRate == null || pointRewardRate <= 0) {
 			return 0L;
 		}
 
-		return finalPaymentAmount / 100;
+		return finalPaymentAmount * pointRewardRate / 100;
 	}
 
 	/**
