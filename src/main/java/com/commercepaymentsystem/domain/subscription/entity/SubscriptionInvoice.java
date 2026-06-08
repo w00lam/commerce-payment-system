@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -19,7 +20,15 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "subscription_invoices")
+@Table(
+	name = "subscription_invoices",
+	uniqueConstraints = {
+		@UniqueConstraint(
+			name = "uk_subscription_invoices_subscription_billing_period",
+			columnNames = {"subscription_id", "billing_period"}
+		)
+	}
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SubscriptionInvoice extends BaseEntity {
 
@@ -79,13 +88,15 @@ public class SubscriptionInvoice extends BaseEntity {
 		return invoice;
 	}
 
-	public void markAsSucceeded(Long earnedPointAmount, LocalDateTime paidAt) {
+	public void markAsSucceeded(String portonePaymentId, Long earnedPointAmount, LocalDateTime paidAt) {
+		this.portonePaymentId = portonePaymentId;
 		this.status = InvoiceStatus.SUCCEEDED;
 		this.earnedPointAmount = earnedPointAmount;
 		this.paidAt = paidAt;
 	}
 
-	public void markAsFailed(String failureReason) {
+	public void markAsFailed(String portonePaymentId, String failureReason) {
+		this.portonePaymentId = portonePaymentId;
 		this.status = InvoiceStatus.FAILED;
 		this.failureReason = failureReason;
 	}

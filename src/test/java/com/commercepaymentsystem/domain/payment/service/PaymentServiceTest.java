@@ -20,6 +20,7 @@ import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.entity.PaymentStatus;
 import com.commercepaymentsystem.domain.payment.exception.PaymentErrorCode;
 import com.commercepaymentsystem.domain.payment.exception.PaymentException;
+import com.commercepaymentsystem.domain.payment.port.MembershipPort;
 import com.commercepaymentsystem.domain.payment.repository.PaymentRepository;
 import com.commercepaymentsystem.infrastructure.portone.client.PortOneClient;
 import com.commercepaymentsystem.infrastructure.portone.dto.PortOnePaymentResponse;
@@ -30,11 +31,13 @@ class PaymentServiceTest {
 	private final PaymentRepository paymentRepository = mock(PaymentRepository.class);
 	private final PaymentIdGenerator paymentIdGenerator = mock(PaymentIdGenerator.class);
 	private final PortOneClient portOneClient = mock(PortOneClient.class);
+	private final MembershipPort membershipPort = mock(MembershipPort.class);
 
 	private final PaymentService paymentService = new PaymentService(
 		paymentRepository,
 		paymentIdGenerator,
-		portOneClient
+		portOneClient,
+		membershipPort
 	);
 
 	@Test
@@ -51,6 +54,7 @@ class PaymentServiceTest {
 
 		when(paymentIdGenerator.generate()).thenReturn("PAY-1234");
 		when(paymentRepository.existsByPaymentId("PAY-1234")).thenReturn(false);
+		when(membershipPort.getPointRewardRate(1L)).thenReturn(5);
 		when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		// when
@@ -68,10 +72,37 @@ class PaymentServiceTest {
 		assertThat(savedPayment.getTotalOrderAmount()).isEqualTo(10_000L);
 		assertThat(savedPayment.getUsedPointAmount()).isEqualTo(2_000L);
 		assertThat(savedPayment.getFinalPaymentAmount()).isEqualTo(8_000L);
+		assertThat(savedPayment.getEarnedPointAmount()).isEqualTo(400L);
 		assertThat(savedPayment.getStatus()).isEqualTo(PaymentStatus.PENDING);
 
 		assertThat(result.paymentId()).isEqualTo("PAY-1234");
 		assertThat(result.status()).isEqualTo(PaymentStatus.PENDING);
+	}
+
+	@Test
+	@DisplayName("Payment creation stores earned points using the membership rate before this payment")
+	void createPendingPayment_usesPreviousMembershipRewardRate() {
+		PaymentCreateCommand command = new PaymentCreateCommand(
+			1L,
+			10L,
+			100_000L,
+			0L,
+			100_000L
+		);
+
+		when(paymentIdGenerator.generate()).thenReturn("PAY-VIP");
+		when(paymentRepository.existsByPaymentId("PAY-VIP")).thenReturn(false);
+		when(membershipPort.getPointRewardRate(1L)).thenReturn(5);
+		when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		paymentService.createPendingPayment(command);
+
+		ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+		verify(paymentRepository).save(paymentCaptor.capture());
+
+		Payment savedPayment = paymentCaptor.getValue();
+		assertThat(savedPayment.getEarnedPointAmount()).isEqualTo(5_000L);
+		verify(membershipPort).getPointRewardRate(1L);
 	}
 
 	@Test
@@ -92,6 +123,7 @@ class PaymentServiceTest {
 		);
 		when(paymentRepository.existsByPaymentId("PAY-duplicated")).thenReturn(true);
 		when(paymentRepository.existsByPaymentId("PAY-unique")).thenReturn(false);
+		when(membershipPort.getPointRewardRate(1L)).thenReturn(1);
 		when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		// when

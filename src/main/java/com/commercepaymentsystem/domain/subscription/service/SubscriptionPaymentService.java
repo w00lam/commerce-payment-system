@@ -5,7 +5,7 @@ import lombok.Getter;
 
 public interface SubscriptionPaymentService {
 
-	PaymentResult pay(String billingKey, Long amount, String orderName);
+	PaymentResult pay(String portonePaymentId, String billingKey, Long amount, String orderName);
 
 	@Getter
 	@AllArgsConstructor
@@ -18,8 +18,8 @@ public interface SubscriptionPaymentService {
 			return new PaymentResult(true, portonePaymentId, null);
 		}
 
-		public static PaymentResult fail(String failureReason) {
-			return new PaymentResult(false, null, failureReason);
+		public static PaymentResult fail(String portonePaymentId, String failureReason) {
+			return new PaymentResult(false, portonePaymentId, failureReason);
 		}
 	}
 }

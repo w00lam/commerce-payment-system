@@ -3,7 +3,13 @@ package com.commercepaymentsystem.infrastructure.portone.exception;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClientResponseException;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+
 public final class PortOneExceptionConverter {
+
+	private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
 	private PortOneExceptionConverter() {
 	}
@@ -75,46 +81,36 @@ public final class PortOneExceptionConverter {
 		return "PortOne " + operationName + " " + reason;
 	}
 
+	/**
+	 * PortOne 오류 응답 본문을 JSON으로 파싱해 표준 오류 필드를 추출합니다.
+	 *
+	 * <p>본문이 비어 있거나 JSON이 아니면 원본 응답 본문은 보존하되 세부 필드는 비운 상태로
+	 * 예외를 생성합니다.</p>
+	 */
 	private static PortOneErrorResponse parseErrorResponse(String responseBody) {
-		return new PortOneErrorResponse(
-			text(responseBody, "type"),
-			text(responseBody, "message"),
-			text(responseBody, "pgCode"),
-			text(responseBody, "pgMessage")
-		);
+		if (isBlank(responseBody)) {
+			return PortOneErrorResponse.empty();
+		}
+
+		try {
+			JsonNode root = OBJECT_MAPPER.readTree(responseBody);
+			return new PortOneErrorResponse(
+				text(root, "type"),
+				text(root, "message"),
+				text(root, "pgCode"),
+				text(root, "pgMessage")
+			);
+		} catch (Exception exception) {
+			return PortOneErrorResponse.empty();
+		}
 	}
 
-	private static String text(String responseBody, String fieldName) {
-		if (isBlank(responseBody)) {
+	private static String text(JsonNode node, String fieldName) {
+		JsonNode value = node.path(fieldName);
+		if (value.isMissingNode() || value.isNull()) {
 			return null;
 		}
-
-		String fieldPattern = "\"" + fieldName + "\"";
-		int fieldIndex = responseBody.indexOf(fieldPattern);
-
-		if (fieldIndex < 0) {
-			return null;
-		}
-
-		int colonIndex = responseBody.indexOf(':', fieldIndex + fieldPattern.length());
-
-		if (colonIndex < 0) {
-			return null;
-		}
-
-		int valueStartIndex = responseBody.indexOf('"', colonIndex + 1);
-
-		if (valueStartIndex < 0) {
-			return null;
-		}
-
-		int valueEndIndex = responseBody.indexOf('"', valueStartIndex + 1);
-
-		if (valueEndIndex < 0) {
-			return null;
-		}
-
-		return responseBody.substring(valueStartIndex + 1, valueEndIndex);
+		return value.asString();
 	}
 
 	private static boolean isAuthenticationFailure(HttpStatusCode statusCode) {
@@ -139,5 +135,8 @@ public final class PortOneExceptionConverter {
 		String pgCode,
 		String pgMessage
 	) {
+		private static PortOneErrorResponse empty() {
+			return new PortOneErrorResponse(null, null, null, null);
+		}
 	}
 }
