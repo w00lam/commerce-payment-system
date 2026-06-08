@@ -49,6 +49,12 @@ public enum SubscriptionErrorCode implements ErrorCode {
 		HttpStatus.CONFLICT,
 		"SUB_007",
 		"이미 다른 회원이 등록한 결제 수단(빌링키)입니다."
+	),
+
+	UNPAID_SUBSCRIPTION(
+		HttpStatus.FORBIDDEN,
+		"SUB_008",
+		"미납된 구독 요금이 존재하여 서비스를 이용할 수 없습니다."
 	);
 
 	private final HttpStatus status;

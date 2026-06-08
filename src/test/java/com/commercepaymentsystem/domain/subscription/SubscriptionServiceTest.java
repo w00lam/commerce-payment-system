@@ -217,17 +217,19 @@ class SubscriptionServiceTest {
 		LocalDate today = LocalDate.now();
 		subscriptionService.processBillingWithLock(subscription.getId(), today);
 
-		// 인보이스가 실패(FAILED)로 생성되고 다음 결제일이 변하지 않았는지 검증
+		// 인보이스가 실패(FAILED)로 생성되고 다음 결제일이 갱신되었는지 검증
 		List<SubscriptionInvoice> invoices = subscriptionInvoiceRepository.findAllBySubscriptionId(subscription.getId());
 		assertThat(invoices).hasSize(1);
 		assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.FAILED);
 		
 		Subscription updatedSub = subscriptionRepository.findById(subscription.getId()).orElseThrow();
-		assertThat(updatedSub.getNextBillingDate()).isEqualTo(LocalDate.now());
+		// 정책 변경: 실패 시에도 다음 결제일로 갱신되고 미납 상태(unpaid=true)가 됨
+		assertThat(updatedSub.getNextBillingDate()).isEqualTo(subscription.getStartedAt().toLocalDate().plusMonths(1));
+		assertThat(updatedSub.isUnpaid()).isTrue();
 	}
 
 	@Test
-	void processBillingWithLock_Overdue_CancelsSubscription() {
+	void processBillingWithLock_Overdue_KeepsSubscriptionActive() {
 		// Given: 다음 결제일이 어제(오늘보다 이전)인 활성 구독
 		Subscription subscription = Subscription.create(member.getId(), basicPlan, successPaymentMethod);
 		subscriptionRepository.save(subscription);
@@ -254,14 +256,13 @@ class SubscriptionServiceTest {
 		LocalDate today = LocalDate.now();
 		subscriptionService.processBillingWithLock(subscription.getId(), today);
 
-		// Then: 실패 기록이 있으므로 미납 정지/해지 처리 (CANCELLED)
+		// Then: 발제문 정책에 따라 실패 기록이 있어도 즉시 해지하지 않고 ACTIVE 유지
 		Subscription updatedSub = subscriptionRepository.findById(subscription.getId()).orElseThrow();
-		assertThat(updatedSub.getStatus()).isEqualTo(SubscriptionStatus.CANCELLED);
+		assertThat(updatedSub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
 
-		// 인보이스 발행 기록 검증 (이미 실패한 인보이스 1건만 존재)
+		// 새로운 인보이스는 발행되지 않아야 함 (이미 해당 기간에 대한 실패 인보이스가 존재하므로 스킵됨)
 		List<SubscriptionInvoice> invoices = subscriptionInvoiceRepository.findAllBySubscriptionId(subscription.getId());
 		assertThat(invoices).hasSize(1);
-		assertThat(invoices.get(0).getStatus()).isEqualTo(InvoiceStatus.FAILED);
 	}
 
 	@Test

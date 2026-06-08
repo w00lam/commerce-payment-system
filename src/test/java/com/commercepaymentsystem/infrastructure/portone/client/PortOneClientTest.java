@@ -249,4 +249,88 @@ class PortOneClientTest {
 			.hasMessageContaining("PortOne 재시도 가능 오류");
 		server.verify();
 	}
+
+	@Test
+	@DisplayName("빌링키 조회 성공 시 빌링키 상세 정보를 반환한다")
+	void getBillingKey_success() {
+		server.expect(once(), requestTo("https://api.portone.test/billing-keys/billing-key-123?storeId=test-store-id"))
+			.andExpect(method(GET))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
+			.andRespond(withSuccess("""
+				{
+				  "billingKey": "billing-key-123",
+				  "status": "ISSUED",
+				  "issuedAt": "2026-06-01T01:02:03Z",
+				  "method": {
+				    "type": "CARD",
+				    "card": {
+				      "name": "TossCard",
+				      "number": "1234-****-****-5678",
+				      "bin": "123456"
+				    }
+				  },
+				  "customer": {
+				    "id": "customer-123"
+				  }
+				}
+				""", APPLICATION_JSON));
+
+		var response = portOneClient.getBillingKey("billing-key-123");
+
+		assertThat(response.billingKey()).isEqualTo("billing-key-123");
+		assertThat(response.status()).isEqualTo("ISSUED");
+		assertThat(response.method().card().name()).isEqualTo("TossCard");
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("빌링키 삭제 호출 시 DELETE 요청을 전송한다")
+	void deleteBillingKey_success() {
+		server.expect(once(), requestTo("https://api.portone.test/billing-keys/billing-key-123?storeId=test-store-id&reason=user-request"))
+			.andExpect(method(DELETE))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
+			.andRespond(withNoContent());
+
+		assertThatCode(() -> portOneClient.deleteBillingKey("billing-key-123", "user-request"))
+			.doesNotThrowAnyException();
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("빌링키 결제 요청 시 POST 요청을 전송하고 결제 응답을 반환한다")
+	void payWithBillingKey_success() {
+		server.expect(once(), requestTo("https://api.portone.test/payments/payment-123/billing-key"))
+			.andExpect(method(POST))
+			.andExpect(header(HttpHeaders.AUTHORIZATION, "PortOne test-api-secret"))
+			.andExpect(content().json("""
+				{
+				  "storeId": "test-store-id",
+				  "billingKey": "billing-key-123",
+				  "orderName": "Monthly Subscription",
+				  "amount": { "total": 10000 },
+				  "currency": "KRW"
+				}
+				"""))
+			.andRespond(withSuccess("""
+				{
+				  "id": "payment-123",
+				  "status": "PAID",
+				  "amount": { "total": 10000 }
+				}
+				""", APPLICATION_JSON));
+
+		var request = new com.commercepaymentsystem.infrastructure.portone.dto.PortOneBillingKeyPaymentRequest(
+			"billing-key-123",
+			"Monthly Subscription",
+			new com.commercepaymentsystem.infrastructure.portone.dto.PortOneBillingKeyPaymentRequest.PortOneBillingKeyPaymentAmount(10_000L),
+			"KRW",
+			new com.commercepaymentsystem.infrastructure.portone.dto.PortOneBillingKeyPaymentRequest.PortOneBillingKeyCustomer("customer-123")
+		);
+
+		PortOnePaymentResponse response = portOneClient.payWithBillingKey("payment-123", request);
+
+		assertThat(response.id()).isEqualTo("payment-123");
+		assertThat(response.status()).isEqualTo("PAID");
+		server.verify();
+	}
 }
