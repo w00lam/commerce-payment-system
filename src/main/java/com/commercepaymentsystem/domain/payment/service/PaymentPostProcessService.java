@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.port.CartPort;
+import com.commercepaymentsystem.domain.payment.port.MembershipPort;
 import com.commercepaymentsystem.domain.payment.port.OrderPort;
 import com.commercepaymentsystem.domain.payment.port.PointPort;
 
@@ -22,6 +23,7 @@ public class PaymentPostProcessService {
 	private final OrderPort orderPort;
 	private final PointPort pointPort;
 	private final CartPort cartPort;
+	private final MembershipPort membershipPort;
 
 	/**
 	 * 결제 정보를 바탕으로 후처리 프로세스(주문 확정, 포인트 처리, 장바구니 청소)를 순차적으로 실행합니다.
@@ -49,6 +51,11 @@ public class PaymentPostProcessService {
 				payment.getId()
 			);
 		}
+
+		membershipPort.applyPayment(
+			payment.getMemberId(),
+			payment.getFinalPaymentAmount()
+		);
 
 		if (!confirmedOrder.cartItemIds().isEmpty()) {
 			cartPort.deleteOrderedCartItems(

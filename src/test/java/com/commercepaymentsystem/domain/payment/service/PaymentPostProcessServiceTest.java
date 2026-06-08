@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.payment.port.CartPort;
+import com.commercepaymentsystem.domain.payment.port.MembershipPort;
 import com.commercepaymentsystem.domain.payment.port.OrderPort;
 import com.commercepaymentsystem.domain.payment.port.PointPort;
 
@@ -20,11 +21,13 @@ class PaymentPostProcessServiceTest {
 	private final OrderPort orderPort = mock(OrderPort.class);
 	private final PointPort pointPort = mock(PointPort.class);
 	private final CartPort cartPort = mock(CartPort.class);
+	private final MembershipPort membershipPort = mock(MembershipPort.class);
 
 	private final PaymentPostProcessService paymentPostProcessService = new PaymentPostProcessService(
 		orderPort,
 		pointPort,
-		cartPort
+		cartPort,
+		membershipPort
 	);
 
 	@Test
@@ -36,10 +39,11 @@ class PaymentPostProcessServiceTest {
 
 		paymentPostProcessService.process(payment);
 
-		InOrder inOrder = inOrder(orderPort, pointPort, cartPort);
+		InOrder inOrder = inOrder(orderPort, pointPort, membershipPort, cartPort);
 		inOrder.verify(orderPort).confirmOrder(10L, 1L);
 		inOrder.verify(pointPort).deductUsedPoint(1L, 2_000L, 100L);
 		inOrder.verify(pointPort).earnPoint(1L, 80L, 100L);
+		inOrder.verify(membershipPort).applyPayment(1L, 8_000L);
 		inOrder.verify(cartPort).deleteOrderedCartItems(1L, List.of(100L, 101L));
 	}
 
@@ -55,6 +59,7 @@ class PaymentPostProcessServiceTest {
 		verify(orderPort).confirmOrder(10L, 1L);
 		verify(pointPort, never()).deductUsedPoint(any(), any(), any());
 		verify(pointPort, never()).earnPoint(any(), any(), any());
+		verify(membershipPort).applyPayment(1L, 0L);
 		verify(cartPort, never()).deleteOrderedCartItems(any(), anyList());
 	}
 
@@ -72,6 +77,7 @@ class PaymentPostProcessServiceTest {
 			.hasMessage("point failure");
 
 		verify(cartPort, never()).deleteOrderedCartItems(any(), anyList());
+		verify(membershipPort, never()).applyPayment(anyLong(), anyLong());
 	}
 
 	private Payment payment(Long usedPointAmount, Long finalPaymentAmount) {
