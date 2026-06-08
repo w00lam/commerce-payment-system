@@ -7,6 +7,7 @@ import com.commercepaymentsystem.domain.point.dto.PointHistoryResponse;
 import com.commercepaymentsystem.domain.point.dto.PointResponse;
 import com.commercepaymentsystem.domain.point.entity.PointHistory;
 import com.commercepaymentsystem.domain.point.entity.PointHistoryType;
+import com.commercepaymentsystem.domain.point.entity.PointSourceType;
 import com.commercepaymentsystem.domain.point.exception.PointErrorCode;
 import com.commercepaymentsystem.domain.point.exception.PointException;
 import com.commercepaymentsystem.domain.point.repository.PointHistoryRepository;
@@ -53,10 +54,16 @@ public class PointService {
 	 * @return 이미 회수 완료된 적립 포인트 총합
 	 */
 	public long getRevokedEarnedPointAmount(Long paymentId) {
+		return getRevokedEarnedPointAmount(paymentId, PointSourceType.ORDER);
+	}
+
+	public long getRevokedEarnedPointAmount(Long paymentId, PointSourceType sourceType) {
 		if (paymentId == null) {
 			throw pointException(PointErrorCode.PAYMENT_ID_REQUIRED);
 		}
-		return pointHistoryRepository.sumAmountByPaymentIdAndType(paymentId, PointHistoryType.EARN_REVOKE);
+		return (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.sumAmountByPaymentIdAndType(paymentId, PointHistoryType.EARN_REVOKE)
+			: pointHistoryRepository.sumAmountByPaymentIdAndTypeAndSourceType(paymentId, PointHistoryType.EARN_REVOKE, sourceType);
 	}
 
 	/**
@@ -64,17 +71,26 @@ public class PointService {
 	 */
 	@Transactional
 	public void earnPoint(Long memberId, Long amount, Long paymentId) {
+		earnPoint(memberId, amount, paymentId, PointSourceType.ORDER);
+	}
+
+	@Transactional
+	public void earnPoint(Long memberId, Long amount, Long paymentId, PointSourceType sourceType) {
 		validatePointRequest(amount, paymentId);
 
 		Member member = findMemberByIdWithLock(memberId);
 
 		// 멱등성 보장: 이미 적립된 경우 리턴
-		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
+		boolean exists = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndSourceType(paymentId, PointHistoryType.EARN, sourceType);
+
+		if (exists) {
 			return;
 		}
 
 		member.addPoint(amount);
-		savePointHistory(memberId, paymentId, PointHistoryType.EARN, amount);
+		savePointHistory(memberId, paymentId, null, PointHistoryType.EARN, amount, sourceType);
 	}
 
 	/**
@@ -82,18 +98,27 @@ public class PointService {
 	 */
 	@Transactional
 	public void deductPoint(Long memberId, Long amount, Long paymentId) {
+		deductPoint(memberId, amount, paymentId, PointSourceType.ORDER);
+	}
+
+	@Transactional
+	public void deductPoint(Long memberId, Long amount, Long paymentId, PointSourceType sourceType) {
 		validatePointRequest(amount, paymentId);
 
 		Member member = findMemberByIdWithLock(memberId);
 
 		// 멱등성 보장: 이미 차감된 경우 리턴
-		if (pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)) {
+		boolean exists = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndSourceType(paymentId, PointHistoryType.USE, sourceType);
+
+		if (exists) {
 			return;
 		}
 
 		// 잔액 검증 및 차감 책임은 Member 엔티티에 위임 (중복 로직 제거)
 		member.deductPoint(amount);
-		savePointHistory(memberId, paymentId, PointHistoryType.USE, amount);
+		savePointHistory(memberId, paymentId, null, PointHistoryType.USE, amount, sourceType);
 	}
 
 	/**
@@ -101,22 +126,35 @@ public class PointService {
 	 */
 	@Transactional
 	public void restorePoint(Long memberId, Long amount, Long paymentId, Long refundId) {
+		restorePoint(memberId, amount, paymentId, refundId, PointSourceType.ORDER);
+	}
+
+	@Transactional
+	public void restorePoint(Long memberId, Long amount, Long paymentId, Long refundId, PointSourceType sourceType) {
 		validateRestoreRequest(amount, paymentId, refundId);
 
 		Member member = findMemberByIdWithLock(memberId);
 
 		// 멱등성 보장: 해당 환불 건에 대해 이미 복구된 경우 리턴
-		if (pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.USE_CANCEL, refundId)) {
+		boolean exists = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.USE_CANCEL, refundId)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndRefundIdAndSourceType(paymentId, PointHistoryType.USE_CANCEL, refundId, sourceType);
+
+		if (exists) {
 			return;
 		}
 
 		// 원본 차감 내역 확인: 사용한 적 없는 포인트를 복구할 수 없음
-		if (!pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)) {
+		boolean hasUsage = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.USE)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndSourceType(paymentId, PointHistoryType.USE, sourceType);
+
+		if (!hasUsage) {
 			throw pointException(PointErrorCode.SOURCE_HISTORY_NOT_FOUND);
 		}
 
 		member.addPoint(amount);
-		savePointHistory(memberId, paymentId, refundId, PointHistoryType.USE_CANCEL, amount);
+		savePointHistory(memberId, paymentId, refundId, PointHistoryType.USE_CANCEL, amount, sourceType);
 	}
 
 	/**
@@ -130,19 +168,28 @@ public class PointService {
 	 */
 	@Transactional
 	public void revokeEarnedPoint(Long memberId, Long amount, Long paymentId, Long refundId) {
+		revokeEarnedPoint(memberId, amount, paymentId, refundId, PointSourceType.ORDER);
+	}
+
+	@Transactional
+	public void revokeEarnedPoint(Long memberId, Long amount, Long paymentId, Long refundId, PointSourceType sourceType) {
 		validateRestoreRequest(amount, paymentId, refundId);
 
 		Member member = findMemberByIdWithLock(memberId);
 
-		if (pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(
-			paymentId,
-			PointHistoryType.EARN_REVOKE,
-			refundId
-		)) {
+		boolean exists = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndTypeAndRefundId(paymentId, PointHistoryType.EARN_REVOKE, refundId)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndRefundIdAndSourceType(paymentId, PointHistoryType.EARN_REVOKE, refundId, sourceType);
+
+		if (exists) {
 			return;
 		}
 
-		if (!pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)) {
+		boolean hasEarn = (sourceType == PointSourceType.ORDER)
+			? pointHistoryRepository.existsByPaymentIdAndType(paymentId, PointHistoryType.EARN)
+			: pointHistoryRepository.existsByPaymentIdAndTypeAndSourceType(paymentId, PointHistoryType.EARN, sourceType);
+
+		if (!hasEarn) {
 			throw pointException(PointErrorCode.SOURCE_HISTORY_NOT_FOUND);
 		}
 
@@ -151,7 +198,7 @@ public class PointService {
 			return;
 		}
 
-		savePointHistory(memberId, paymentId, refundId, PointHistoryType.EARN_REVOKE, revokedAmount);
+		savePointHistory(memberId, paymentId, refundId, PointHistoryType.EARN_REVOKE, revokedAmount, sourceType);
 	}
 
 	private void validatePointRequest(Long amount, Long paymentId) {
@@ -176,11 +223,11 @@ public class PointService {
 	}
 
 	private void savePointHistory(Long memberId, Long paymentId, PointHistoryType type, Long amount) {
-		savePointHistory(memberId, paymentId, null, type, amount);
+		savePointHistory(memberId, paymentId, null, type, amount, PointSourceType.ORDER);
 	}
 
-	private void savePointHistory(Long memberId, Long paymentId, Long refundId, PointHistoryType type, Long amount) {
-		PointHistory history = new PointHistory(memberId, paymentId, refundId, type, amount);
+	private void savePointHistory(Long memberId, Long paymentId, Long refundId, PointHistoryType type, Long amount, PointSourceType sourceType) {
+		PointHistory history = new PointHistory(memberId, paymentId, refundId, type, amount, sourceType);
 		pointHistoryRepository.save(history);
 	}
 

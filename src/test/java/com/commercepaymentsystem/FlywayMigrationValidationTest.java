@@ -22,7 +22,8 @@ import java.util.stream.Stream;
 @ActiveProfiles("test")
 @Import(FlywayMigrationValidationTest.TestConfig.class)
 @SpringBootTest(properties = {
-    "spring.jpa.hibernate.ddl-auto=validate"
+    "spring.jpa.hibernate.ddl-auto=validate",
+    "spring.datasource.url=jdbc:h2:mem:validationdb;MODE=MySQL;DB_CLOSE_DELAY=-1"
 })
 class FlywayMigrationValidationTest {
 
