@@ -1,5 +1,6 @@
 package com.commercepaymentsystem.domain.refund.facade;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -28,6 +29,9 @@ import lombok.extern.slf4j.Slf4j;
 public class RefundFacade {
 
 	private static final String CANCEL_REQUESTER = "CUSTOMER";
+
+	@Value("${portone.bypass-verification:false}")
+	private boolean bypassVerification;
 
 	private final RefundService refundService;
 	private final PaymentService paymentService;
@@ -82,6 +86,11 @@ public class RefundFacade {
 
 	private void cancelPgPayment(PreparedRefund preparedRefund) {
 		if (preparedRefund.pgAmount() <= 0) {
+			return;
+		}
+
+		if (bypassVerification) {
+			log.info("PortOne PG 환불 요청 우회 (bypass-verification=true). paymentId={}, pgAmount={}", preparedRefund.portOnePaymentId(), preparedRefund.pgAmount());
 			return;
 		}
 
