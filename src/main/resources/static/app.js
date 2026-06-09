@@ -294,7 +294,8 @@
                 customer: {
                     customerId: String(order.memberId || member.memberId || ""),
                     fullName: member.name || "Roviq 고객",
-                    email: member.email || value("emailInput") || "tester@example.com"
+                    email: member.email || value("emailInput") || "tester@example.com",
+                    phoneNumber: member.phone || value("phoneInput") || "010-1234-5678"
                 }
             };
 
@@ -359,6 +360,13 @@
         }
         withLoading(api.refunds.create(paymentId, { reason: value("refundReason") || "고객 요청", items: items })).then(function () {
             toast("환불 요청이 접수되었습니다.", "ok");
+            var orderId = state.orderDetail ? state.orderDetail.orderId : null;
+            refreshOrders();
+            refreshPoints(true);
+            refreshMembership(true);
+            if (orderId) {
+                loadOrderDetail(orderId);
+            }
         }).catch(showError);
     }
 
@@ -371,12 +379,60 @@
 
     function registerPaymentMethod() {
         requireLogin(function () {
-            withLoading(api.subscriptions.registerPaymentMethod({
-                portoneBillingKey: value("billingKey"),
-                cardCompanyName: value("cardCompany")
-            })).then(function () {
-                toast("정기 결제수단을 등록했습니다.", "ok");
+            toast("결제수단 등록창을 여는 중입니다.", "ok");
+            requestPortOneBillingKey().then(function (response) {
+                var billingKey = response.billingKey;
+                var cardCompany = (response.billingKeyMethod && response.billingKeyMethod.card && response.billingKeyMethod.card.name)
+                                   || value("cardCompany")
+                                   || "등록 카드";
+
+                return withLoading(api.subscriptions.registerPaymentMethod({
+                    portoneBillingKey: billingKey,
+                    cardCompanyName: cardCompany
+                })).then(function () {
+                    toast("정기 결제수단을 등록했습니다.", "ok");
+                    var billingKeyInput = document.getElementById("billingKey");
+                    if (billingKeyInput) {
+                        billingKeyInput.value = billingKey;
+                    }
+                    var cardCompanyInput = document.getElementById("cardCompany");
+                    if (cardCompanyInput) {
+                        cardCompanyInput.value = cardCompany;
+                    }
+                });
             }).catch(showError);
+        });
+    }
+
+    function requestPortOneBillingKey() {
+        return Promise.resolve().then(function () {
+            var billingConfig = config.getPortOneBillingConfig ? config.getPortOneBillingConfig() : {};
+            if (!billingConfig || !billingConfig.storeId || !billingConfig.channelKey) {
+                throw new Error("빌링 결제창 설정을 불러오지 못했습니다.");
+            }
+            if (!window.PortOne || typeof window.PortOne.requestIssueBillingKey !== "function") {
+                throw new Error("포트원 SDK를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+            }
+
+            var member = readMember() || {};
+            var request = {
+                storeId: billingConfig.storeId,
+                channelKey: billingConfig.channelKey,
+                billingKeyMethod: "CARD",
+                customer: {
+                    customerId: String(member.memberId || ""),
+                    fullName: member.name || "Roviq 고객",
+                    email: member.email || value("emailInput") || "tester@example.com",
+                    phoneNumber: member.phone || value("phoneInput") || "010-1234-5678"
+                }
+            };
+
+            return window.PortOne.requestIssueBillingKey(request).then(function (response) {
+                if (response.code !== undefined) {
+                    throw new Error(response.message || "빌링키 발급 실패");
+                }
+                return response;
+            });
         });
     }
 
@@ -568,23 +624,29 @@
 
     function orderLine(order) {
         var status = order.status || order.orderStatus || "-";
+        var isCreated = status === "CREATED";
         return '<div class="order-line"><div><strong>' + escapeHtml(order.orderNumber || ("주문 #" + order.orderId)) + '</strong><p class="muted">' + dateText(order.orderedAt) + '</p></div>' +
             '<div class="actions"><span class="badge ' + statusClass(status) + '">' + escapeHtml(status) + '</span>' +
             '<button class="btn secondary" data-action="order-detail" data-id="' + order.orderId + '">상세보기</button>' +
-            '<button class="btn danger" data-action="cancel-order" data-id="' + order.orderId + '">취소</button></div></div>';
+            (isCreated ? '<button class="btn danger" data-action="cancel-order" data-id="' + order.orderId + '">취소</button>' : '') + '</div></div>';
     }
 
     function orderDetailHtml() {
         var detail = state.orderDetail;
         if (!detail) return empty("주문을 선택하면 상세 정보가 표시됩니다.");
         var payment = detail.payment || {};
+        var paymentStatus = payment.status || "-";
+        var showConfirm = paymentStatus === "PENDING";
+        var showRefund = paymentStatus === "CONFIRMED" || paymentStatus === "PARTIAL_REFUNDED";
         return '<p><span class="label">주문번호</span><strong>' + escapeHtml(detail.orderNumber) + '</strong></p>' +
             '<p><span class="label">주문 상태</span><span class="badge ' + statusClass(detail.orderStatus) + '">' + escapeHtml(detail.orderStatus) + '</span></p>' +
-            '<p><span class="label">결제 상태</span><span class="badge ' + statusClass(payment.status) + '">' + escapeHtml(payment.status || "-") + '</span></p>' +
+            '<p><span class="label">결제 상태</span><span class="badge ' + statusClass(paymentStatus) + '">' + escapeHtml(paymentStatus) + '</span></p>' +
             '<p class="price">' + money(payment.finalPaymentAmount || detail.totalPrice) + '</p>' +
-            '<input id="refundReason" value="고객 요청" aria-label="환불 사유">' +
-            '<div class="actions"><button class="btn primary" data-action="confirm-payment" data-id="' + payment.paymentId + '">결제 확인</button>' +
-            '<button class="btn danger" data-action="refund" data-id="' + payment.paymentId + '">환불 요청</button></div>';
+            (showRefund ? '<input id="refundReason" value="고객 요청" aria-label="환불 사유">' : '') +
+            '<div class="actions">' +
+            (showConfirm ? '<button class="btn primary" data-action="confirm-payment" data-id="' + payment.paymentId + '">결제 확인</button>' : '') +
+            (showRefund ? '<button class="btn danger" data-action="refund" data-id="' + payment.paymentId + '">환불 요청</button>' : '') +
+            '</div>';
     }
 
     function membershipHtml() {
