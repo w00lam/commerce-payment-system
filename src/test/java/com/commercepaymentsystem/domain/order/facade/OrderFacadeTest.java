@@ -361,7 +361,7 @@ class OrderFacadeTest {
 			usedPointAmount
 		);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
 			.thenReturn(List.of(firstCartItem, secondCartItem));
@@ -428,7 +428,7 @@ class OrderFacadeTest {
 		assertThat(command.finalPaymentAmount()).isEqualTo(79000L);
 		assertThat(command.orderName()).isEqualTo(savedOrder.getOrderName());
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
 		verify(productService).deductProductStocks(List.of(firstCartItem, secondCartItem));
 		verify(orderService).createOrder(
@@ -478,7 +478,7 @@ class OrderFacadeTest {
 			usedPointAmount
 		);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
 			.thenReturn(List.of(cartItem));
@@ -526,7 +526,7 @@ class OrderFacadeTest {
 		OrderCreateRequest request = new OrderCreateRequest(List.of(), 1000L);
 		Member member = createMember(memberId, 5000L);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntities(memberId))
 			.thenReturn(List.of());
@@ -536,7 +536,7 @@ class OrderFacadeTest {
 			.isInstanceOf(BusinessException.class)
 			.hasMessage(OrderErrorCode.EMPTY_ORDER_ITEM.getMessage());
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService).findCartEntities(memberId);
 		verify(productService, never()).deductProductStocks(anyList());
 		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
@@ -555,7 +555,7 @@ class OrderFacadeTest {
 		Member member = createMember(memberId, 5000L);
 		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L, 2L)))
 			.thenReturn(List.of(cartItem));
@@ -565,7 +565,7 @@ class OrderFacadeTest {
 			.isInstanceOf(BusinessException.class)
 			.hasMessage(CartErrorCode.CART_ITEM_NOT_FOUND.getMessage());
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L, 2L));
 		verify(productService, never()).deductProductStocks(anyList());
 		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
@@ -583,7 +583,7 @@ class OrderFacadeTest {
 		Member member = createMember(memberId, 5000L);
 		CartItem cartItem = createCartItem(1L, memberId, productId, 1L);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
 			.thenReturn(List.of(cartItem));
@@ -597,7 +597,7 @@ class OrderFacadeTest {
 
 		assertThat(member.getPointBalance()).isEqualTo(5000L);
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L));
 		verify(productService).deductProductStocks(List.of(cartItem));
 		verify(orderService, never()).createOrder(any(), anyList(), anyList(), any());
@@ -619,7 +619,7 @@ class OrderFacadeTest {
 
 		Member member = createMember(memberId, 5000L);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 
 		// when & then
@@ -627,7 +627,7 @@ class OrderFacadeTest {
 			.isInstanceOf(BusinessException.class)
 			.hasMessage("포인트 잔액이 부족합니다.");
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService, never()).findCartEntities(any());
 		verify(cartService, never()).findCartEntitiesByIds(any(), anyList());
 		verify(productService, never()).deductProductStocks(anyList());
@@ -660,7 +660,7 @@ class OrderFacadeTest {
 			ProductStatus.ON_SALE
 		);
 
-		when(memberService.getMember(memberId))
+		when(memberService.getMemberForUpdate(memberId))
 			.thenReturn(member);
 		when(cartService.findCartEntitiesByIds(memberId, List.of(1L)))
 			.thenReturn(List.of(cartItem));
@@ -679,7 +679,7 @@ class OrderFacadeTest {
 			.isInstanceOf(BusinessException.class)
 			.hasMessage(OrderErrorCode.INVALID_POINT_AMOUNT.getMessage());
 
-		verify(memberService).getMember(memberId);
+		verify(memberService).getMemberForUpdate(memberId);
 		verify(cartService).findCartEntitiesByIds(memberId, List.of(1L));
 		verify(productService).deductProductStocks(List.of(cartItem));
 		verify(orderService).createOrder(

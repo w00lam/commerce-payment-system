@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.commercepaymentsystem.domain.payment.entity.Payment;
 import com.commercepaymentsystem.domain.refund.entity.Refund;
 import com.commercepaymentsystem.domain.refund.entity.RefundItem;
+import com.commercepaymentsystem.domain.refund.port.RefundMembershipPort;
 import com.commercepaymentsystem.domain.refund.port.RefundOrderPort;
 import com.commercepaymentsystem.domain.refund.port.RefundPointPort;
 import com.commercepaymentsystem.domain.refund.port.RefundProductPort;
@@ -23,12 +24,14 @@ public class RefundPostProcessService {
 	private final RefundOrderPort refundOrderPort;
 	private final RefundPointPort refundPointPort;
 	private final RefundProductPort refundProductPort;
+	private final RefundMembershipPort refundMembershipPort;
 
 	public void process(Payment payment, Long orderId, Refund refund, boolean isFullRefund) {
 		Map<Long, Long> productQuantities = refundOrderPort.restoreProductStock(orderId, refundQuantities(refund));
 		refundProductPort.restoreProductStocks(productQuantities);
 		restorePoint(payment, refund);
 		revokeEarnedPoint(payment, refund, isFullRefund);
+		refundMembershipPort.applyRefund(payment.getMemberId(), refund.getPgRefundAmount());
 
 		if (isFullRefund) {
 			refundOrderPort.cancelOrder(orderId);

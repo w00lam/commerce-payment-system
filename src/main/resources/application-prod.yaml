@@ -41,7 +41,8 @@ portone:
   api-secret: ${PORTONE_API_SECRET}
   store-id: ${PORTONE_STORE_ID}
   channel-key: ${PORTONE_CHANNEL_KEY}
-  connect-timeout: 3s
-  read-timeout: 5s
+  billing-channel-key: ${PORTONE_BILLING_CHANNEL_KEY}
+  connect-timeout: ${PORTONE_CONNECT_TIMEOUT}
+  read-timeout: ${PORTONE_READ_TIMEOUT}
   webhook:
     secret: ${PORTONE_WEBHOOK_SECRET}

@@ -83,6 +83,7 @@ jobs:
               "INSTANCE_ID=$(curl -s -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/instance-id)",
               "rm -f .env",
               "aws ssm get-parameters-by-path --path \"/config/prod/\" --with-decryption --region ${{ secrets.AWS_REGION }} --query \"Parameters[*].[Name,Value]\" --output text | while read -r name value; do var_name=${name##*/}; echo \"${var_name}=${value}\" >> .env; done",
+              "for required in DB_URL DB_USERNAME DB_PASSWORD JWT_SECRET JWT_ACCESS_TOKEN_EXPIRATION PORTONE_API_SECRET PORTONE_STORE_ID PORTONE_CHANNEL_KEY PORTONE_BILLING_CHANNEL_KEY PORTONE_CONNECT_TIMEOUT PORTONE_READ_TIMEOUT PORTONE_WEBHOOK_SECRET; do if ! grep -q \"^$required=\" .env; then echo \"Missing required SSM parameter: /config/prod/$required\"; exit 1; fi; done",
               "docker run -d --name \"commerce-payment-$NEXT\" -p $NEXT_PORT:8080 --env-file .env --restart always ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/commerce-payment:${{ github.sha }}",
               "HEALTHY=false",
               "for i in {1..12}; do if curl -s http://localhost:$NEXT_PORT/index.html > /dev/null || curl -s http://localhost:$NEXT_PORT/health > /dev/null; then HEALTHY=true; break; fi; sleep 5; done",
