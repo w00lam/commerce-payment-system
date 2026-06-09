@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,9 @@ public class PaymentService {
 	private final PaymentIdGenerator paymentIdGenerator;
 	private final PortOneClient portOneClient;
 	private final MembershipPort membershipPort;
+
+	@Value("${portone.bypass-verification:false}")
+	private boolean bypassVerification;
 
 	/**
 	 * 주문에서 확정된 금액 정보를 기준으로 대기 상태 결제를 생성합니다.
@@ -76,6 +80,11 @@ public class PaymentService {
 		validateConfirmableStatus(payment);
 
 		if (isPointOnlyPayment(payment)) {
+			payment.confirm(Instant.now());
+			return payment;
+		}
+
+		if (bypassVerification) {
 			payment.confirm(Instant.now());
 			return payment;
 		}
@@ -264,6 +273,11 @@ public class PaymentService {
 		}
 
 		validateConfirmableStatus(payment);
+
+		if (bypassVerification) {
+			payment.confirm(Instant.now());
+			return new PaymentConfirmation(payment, true);
+		}
 
 		PortOnePaymentResponse portOnePayment = loadPortOnePayment(paymentId);
 		validatePortOnePayment(payment, portOnePayment);

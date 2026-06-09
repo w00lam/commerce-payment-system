@@ -3,375 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commerce Payment API Tester</title>
-    <style>
-        :root {
-            --bg: #f6f7f9;
-            --panel: #ffffff;
-            --panel-soft: #f0f3f7;
-            --line: #d8dee7;
-            --text: #17202a;
-            --muted: #687385;
-            --primary: #1d72e8;
-            --primary-dark: #1558b8;
-            --success: #147d4f;
-            --danger: #c93535;
-            --code: #101828;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: var(--bg);
-            color: var(--text);
-            font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-            font-size: 14px;
-        }
-
-        header {
-            height: 58px;
-            padding: 0 22px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #152032;
-            color: #fff;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        }
-
-        h1 {
-            margin: 0;
-            font-size: 18px;
-            letter-spacing: 0;
-        }
-
-        .header-meta {
-            color: rgba(255, 255, 255, 0.72);
-            font-size: 12px;
-        }
-
-        main {
-            width: min(1280px, 100%);
-            margin: 0 auto;
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 360px minmax(0, 1fr);
-            gap: 16px;
-        }
-
-        section {
-            background: var(--panel);
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            min-width: 0;
-        }
-
-        .panel-head {
-            padding: 14px 16px;
-            border-bottom: 1px solid var(--line);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-        }
-
-        h2 {
-            margin: 0;
-            font-size: 15px;
-        }
-
-        .panel-body {
-            padding: 16px;
-        }
-
-        .stack {
-            display: grid;
-            gap: 12px;
-        }
-
-        label {
-            display: grid;
-            gap: 6px;
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        input,
-        select,
-        textarea {
-            width: 100%;
-            border: 1px solid var(--line);
-            border-radius: 6px;
-            background: #fff;
-            color: var(--text);
-            font: inherit;
-            padding: 9px 10px;
-            outline: none;
-        }
-
-        textarea {
-            min-height: 240px;
-            resize: vertical;
-            font-family: Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-
-        input:focus,
-        select:focus,
-        textarea:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(29, 114, 232, 0.12);
-        }
-
-        .row {
-            display: grid;
-            grid-template-columns: 120px 1fr;
-            gap: 10px;
-        }
-
-        .button-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        button {
-            border: 1px solid var(--line);
-            border-radius: 6px;
-            background: #fff;
-            color: var(--text);
-            font: inherit;
-            font-weight: 700;
-            padding: 9px 12px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: var(--panel-soft);
-        }
-
-        button.primary {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: #fff;
-        }
-
-        button.primary:hover {
-            background: var(--primary-dark);
-        }
-
-        button:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-
-        .tabs {
-            display: grid;
-            gap: 6px;
-            max-height: calc(100vh - 142px);
-            overflow: auto;
-        }
-
-        .preset {
-            width: 100%;
-            padding: 10px;
-            display: grid;
-            grid-template-columns: 56px 1fr;
-            align-items: start;
-            gap: 8px;
-            text-align: left;
-        }
-
-        .preset strong {
-            color: var(--primary);
-            font-size: 12px;
-        }
-
-        .preset span {
-            overflow-wrap: anywhere;
-            font-family: Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .auth-state {
-            padding: 10px;
-            border-radius: 6px;
-            background: var(--panel-soft);
-            color: var(--muted);
-            font-size: 12px;
-            word-break: break-all;
-        }
-
-        .auth-state.has-token {
-            color: var(--success);
-            background: #e8f6ef;
-        }
-
-        .status {
-            display: inline-flex;
-            align-items: center;
-            min-height: 28px;
-            padding: 4px 9px;
-            border-radius: 999px;
-            background: var(--panel-soft);
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 800;
-        }
-
-        .status.ok {
-            background: #e8f6ef;
-            color: var(--success);
-        }
-
-        .status.error {
-            background: #fff0f0;
-            color: var(--danger);
-        }
-
-        pre {
-            margin: 0;
-            min-height: 360px;
-            max-height: calc(100vh - 454px);
-            overflow: auto;
-            border-radius: 7px;
-            background: var(--code);
-            color: #d5e4ff;
-            padding: 14px;
-            font-family: Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 13px;
-            line-height: 1.55;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .muted {
-            color: var(--muted);
-            font-size: 12px;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        @media (max-width: 900px) {
-            main {
-                grid-template-columns: 1fr;
-                padding: 12px;
-            }
-
-            header {
-                height: auto;
-                min-height: 58px;
-                align-items: flex-start;
-                flex-direction: column;
-                padding: 12px 16px;
-                gap: 4px;
-            }
-
-            .tabs,
-            pre {
-                max-height: none;
-            }
-
-            .row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <title>Roviq Market</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-    <h1>Commerce Payment API Tester</h1>
-    <div class="header-meta">HTML + JavaScript</div>
+<div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+<div id="confirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+        <h2 id="confirmTitle">확인</h2>
+        <p id="confirmMessage"></p>
+        <div class="modal-actions">
+            <button type="button" class="btn secondary" id="confirmCancel">취소</button>
+            <button type="button" class="btn danger" id="confirmOk">진행</button>
+        </div>
+    </div>
+</div>
+
+<div id="cartModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+        <h2>장바구니에 담았어요</h2>
+        <p>바로 장바구니로 이동할까요, 계속 둘러볼까요?</p>
+        <div class="modal-actions">
+            <button type="button" class="btn secondary" id="keepShopping">계속 둘러보기</button>
+            <button type="button" class="btn primary" id="openCart">장바구니 보기</button>
+        </div>
+    </div>
+</div>
+
+<header class="topbar">
+    <button class="brand" type="button" data-view="home">
+        <span class="brand-mark">R</span>
+        <span>Roviq Market</span>
+    </button>
+    <label class="search">
+        <span>검색</span>
+        <input id="searchInput" type="search" placeholder="상품명을 검색해보세요">
+    </label>
+    <nav class="quick-nav">
+        <button type="button" data-view="orders">주문</button>
+        <button type="button" data-view="points">포인트</button>
+        <button type="button" data-view="subscriptions">구독</button>
+    </nav>
 </header>
 
 <main>
-    <section>
-        <div class="panel-head">
-            <h2>API 목록</h2>
-            <button type="button" id="resetStorageBtn">초기화</button>
+    <section class="hero">
+        <div>
+            <p class="eyebrow">오늘의 결제 혜택</p>
+            <h1>상품 선택부터 결제 완료까지 한 번에</h1>
+            <p>장바구니, 포인트, 멤버십, 정기 구독까지 자연스럽게 이어지는 쇼핑 경험입니다.</p>
         </div>
-        <div class="panel-body stack">
-            <label>
-                Base URL
-                <input id="baseUrlInput" type="text" value="http://localhost:8080">
-            </label>
-            <div id="authState" class="auth-state">저장된 토큰 없음</div>
-            <div class="button-row">
-                <button type="button" id="applyTokenBtn">응답에서 토큰 저장</button>
-                <button type="button" id="clearTokenBtn">토큰 삭제</button>
+        <form class="login-panel" id="loginForm">
+            <div class="profile-row hidden" id="profileRow">
+                <div class="avatar" id="profileAvatar">R</div>
+                <div>
+                    <strong id="profileName">로그인됨</strong>
+                    <span id="profileEmail"></span>
+                </div>
             </div>
-            <div class="tabs" id="presetList"></div>
+            <div id="loginFields" class="login-fields">
+                <input id="emailInput" type="email" value="tester@example.com" aria-label="이메일">
+                <input id="passwordInput" type="password" value="password1234" aria-label="비밀번호">
+                <input id="nameInput" type="hidden" value="테스터">
+                <input id="phoneInput" type="hidden" value="010-1234-5678">
+            </div>
+            <div class="login-actions">
+                <button type="submit" class="btn primary">로그인</button>
+                <button type="button" class="btn secondary" id="signupBtn">가입하기</button>
+                <button type="button" class="btn secondary" id="logoutBtn">로그아웃</button>
+            </div>
+        </form>
+    </section>
+
+    <nav class="tabs" aria-label="쇼핑 메뉴">
+        <button type="button" class="active" data-view="home">쇼핑</button>
+        <button type="button" data-view="cart">장바구니</button>
+        <button type="button" data-view="orders">주문</button>
+        <button type="button" data-view="points">포인트</button>
+        <button type="button" data-view="membership">멤버십</button>
+        <button type="button" data-view="subscriptions">구독</button>
+        <button type="button" data-view="seller">판매자</button>
+    </nav>
+
+    <section class="summary-grid">
+        <div>
+            <span>장바구니</span>
+            <strong id="cartSummary">0개</strong>
+        </div>
+        <div>
+            <span>보유 포인트</span>
+            <strong id="pointSummary">-</strong>
+        </div>
+        <div>
+            <span>멤버십</span>
+            <strong id="membershipSummary">-</strong>
+        </div>
+        <div>
+            <span>구독</span>
+            <strong id="subscriptionSummary">-</strong>
         </div>
     </section>
 
-    <section>
-        <div class="panel-head">
-            <h2>요청</h2>
-            <span id="requestStatus" class="status">대기</span>
-        </div>
-        <div class="panel-body stack">
-            <div class="row">
-                <label>
-                    Method
-                    <select id="methodInput">
-                        <option>GET</option>
-                        <option>POST</option>
-                        <option>PUT</option>
-                        <option>PATCH</option>
-                        <option>DELETE</option>
-                    </select>
-                </label>
-                <label>
-                    Path
-                    <input id="pathInput" type="text" value="/health">
-                </label>
-            </div>
-
-            <label>
-                Authorization
-                <input id="tokenInput" type="text" placeholder="Bearer 토큰은 로그인 후 자동 저장됩니다.">
-            </label>
-
-            <label>
-                Query String
-                <input id="queryInput" type="text" placeholder="page=0&size=20">
-            </label>
-
-            <label id="bodyLabel">
-                JSON Body
-                <textarea id="bodyInput" spellcheck="false">{}</textarea>
-            </label>
-
-            <div class="button-row">
-                <button type="button" class="primary" id="sendBtn">요청 보내기</button>
-                <button type="button" id="formatBtn">JSON 정렬</button>
-                <button type="button" id="copyResponseBtn">응답 복사</button>
-            </div>
-
-            <div class="muted" id="requestUrl"></div>
-
-            <section>
-                <div class="panel-head">
-                    <h2>응답</h2>
-                    <span id="elapsedTime" class="muted"></span>
-                </div>
-                <div class="panel-body">
-                    <pre id="responseOutput">아직 요청하지 않았습니다.</pre>
-                </div>
-            </section>
-        </div>
-    </section>
+    <section id="viewRoot"></section>
 </main>
 
-<script src="js/api-tester.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="https://cdn.portone.io/v2/browser-sdk.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
