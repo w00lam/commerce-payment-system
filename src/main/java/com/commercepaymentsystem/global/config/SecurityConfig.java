@@ -1,6 +1,7 @@
 package com.commercepaymentsystem.global.config;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
@@ -13,6 +14,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.commercepaymentsystem.global.exception.GlobalErrorCode;
 import com.commercepaymentsystem.global.filter.JwtAuthFilter;
@@ -37,6 +41,10 @@ public class SecurityConfig {
 		"/cart",
 		"/orders/**",
 		"/checkout",
+		"/styles.css",
+		"/config.js",
+		"/api.js",
+		"/app.js",
 		"/css/**",
 		"/js/**",
 		"/images/**",
@@ -47,10 +55,10 @@ public class SecurityConfig {
 	private static final String[] PUBLIC_API_URLS = {
 		"/api/auth/signup",
 		"/api/auth/login",
+		"/api/auth/logout",
 		"/api/products/**",
 		"/api/webhooks/**",
-		"/api/payments/webhooks/portone",
-		"/api/config/**"
+		"/api/payments/webhooks/portone"
 	};
 
 	private final JwtAuthFilter jwtAuthFilter;
@@ -59,6 +67,7 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http
+			.cors(cors -> cors.configurationSource(corsConfigurationSource()))
 			.csrf(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.formLogin(AbstractHttpConfigurer::disable)
@@ -94,6 +103,24 @@ public class SecurityConfig {
 	@Bean
 	public PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
+	}
+
+	@Bean
+	public CorsConfigurationSource corsConfigurationSource() {
+		CorsConfiguration configuration = new CorsConfiguration();
+		configuration.setAllowedOriginPatterns(List.of(
+			"https://roviq.click",
+			"http://localhost:*",
+			"http://127.0.0.1:*"
+		));
+		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+		configuration.setAllowedHeaders(List.of("*"));
+		configuration.setExposedHeaders(List.of("Authorization"));
+		configuration.setAllowCredentials(false);
+
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", configuration);
+		return source;
 	}
 
 	private void writeErrorResponse(
